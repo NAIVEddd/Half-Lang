@@ -1,0 +1,123 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Parser">
+      <UniqueIdentifier>{4d1c5e08-0bdd-498d-b22d-72c404a83c87}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Syntax">
+      <UniqueIdentifier>{27075e8e-b04a-45aa-b25d-27d7ca1a6ff4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IR">
+      <UniqueIdentifier>{c34af27e-d7fa-4b16-bcba-b7ce46ae2182}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CodeGen">
+      <UniqueIdentifier>{15b5b416-f061-49b4-9201-5bf351e3ef08}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="HalfFunctionalLang.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Parser\Primitives.cpp">
+      <Filter>Parser</Filter>
+    </ClCompile>
+    <ClCompile Include="Parser\Operator.cpp">
+      <Filter>Parser</Filter>
+    </ClCompile>
+    <ClCompile Include="Parser\CharParsers.cpp">
+      <Filter>Parser</Filter>
+    </ClCompile>
+    <ClCompile Include="Syntax\Base.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="IR\IR.cpp">
+      <Filter>IR</Filter>
+    </ClCompile>
+    <ClCompile Include="IR\Symbol.cpp">
+      <Filter>IR</Filter>
+    </ClCompile>
+    <ClCompile Include="IR\Semant.cpp">
+      <Filter>IR</Filter>
+    </ClCompile>
+    <ClCompile Include="CodeGen\Assem.cpp">
+      <Filter>CodeGen</Filter>
+    </ClCompile>
+    <ClCompile Include="CodeGen\Graph.cpp">
+      <Filter>CodeGen</Filter>
+    </ClCompile>
+    <ClCompile Include="CodeGen\Liveness.cpp">
+      <Filter>CodeGen</Filter>
+    </ClCompile>
+    <ClCompile Include="CodeGen\Color.cpp">
+      <Filter>CodeGen</Filter>
+    </ClCompile>
+    <ClCompile Include="CodeGen\RegAlloc.cpp">
+      <Filter>CodeGen</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Parser\Parser.h">
+      <Filter>Parser</Filter>
+    </ClInclude>
+    <ClInclude Include="test.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Parser\Primitives.h">
+      <Filter>Parser</Filter>
+    </ClInclude>
+    <ClInclude Include="Parser\CharParsers.h">
+      <Filter>Parser</Filter>
+    </ClInclude>
+    <ClInclude Include="Syntax\Base.h">
+      <Filter>Syntax</Filter>
+    </ClInclude>
+    <ClInclude Include="Parser\Operator.h">
+      <Filter>Parser</Filter>
+    </ClInclude>
+    <ClInclude Include="Syntax\ExprParser.h">
+      <Filter>Syntax</Filter>
+    </ClInclude>
+    <ClInclude Include="IR\IR.h">
+      <Filter>IR</Filter>
+    </ClInclude>
+    <ClInclude Include="IR\Symbol.h">
+      <Filter>IR</Filter>
+    </ClInclude>
+    <ClInclude Include="IR\Temp.h">
+      <Filter>IR</Filter>
+    </ClInclude>
+    <ClInclude Include="IR\MakeIR.h">
+      <Filter>IR</Filter>
+    </ClInclude>
+    <ClInclude Include="IR\Semant.h">
+      <Filter>IR</Filter>
+    </ClInclude>
+    <ClInclude Include="CodeGen\Assem.h">
+      <Filter>CodeGen</Filter>
+    </ClInclude>
+    <ClInclude Include="CodeGen\Graph.h">
+      <Filter>CodeGen</Filter>
+    </ClInclude>
+    <ClInclude Include="CodeGen\Liveness.h">
+      <Filter>CodeGen</Filter>
+    </ClInclude>
+    <ClInclude Include="CodeGen\Color.h">
+      <Filter>CodeGen</Filter>
+    </ClInclude>
+    <ClInclude Include="CodeGen\RegAlloc.h">
+      <Filter>CodeGen</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
