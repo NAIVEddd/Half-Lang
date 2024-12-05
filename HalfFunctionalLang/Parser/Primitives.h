@@ -1,4 +1,5 @@
 #pragma once
+#include "Parser.h"
 #include <string>
 #include <array>
 #include <list>
@@ -8,19 +9,6 @@
 #include <concepts>
 #include <functional>
 #include <type_traits>
-
-// Parser a :: String -> Maybe (a, String)
-using ParserInput = std::string_view;
-template <typename T>
-using ParserResult = std::optional<std::pair<T, ParserInput>>;
-template<typename P>
-using OptPairParse_t = std::invoke_result_t<P, ParserInput>;
-template<typename T>
-using PairParse_t = typename OptPairParse_t<T>::value_type;
-template<typename T>
-using ParserResult_t = typename PairParse_t<T>::first_type;
-template <typename T>
-using Parser = std::function<ParserResult<T>(ParserInput)>;
 
 
 bool IsAnyChar(char c);
@@ -170,8 +158,22 @@ constexpr auto BetweenPair(char o, char c)
 			}
 			int pair = 1;
 			size_t index = -1;
+            size_t i = 1;
 			std::vector<char> vec;
-			for (size_t i = 1; i < s.length(); i++)
+			for (auto iter = s.begin() + 1; iter != s.end(); ++iter, ++i)
+			{
+				if (*iter == o)
+					pair += 1;
+				if (*iter == c)
+					pair -= 1;
+				if (pair == 0)
+				{
+					index = i;
+					break;
+				}
+				vec.push_back(*iter);
+			}
+			/*for (size_t i = 1; i < s.length(); i++)
 			{
 				if (s[i] == o)
 					pair += 1;
@@ -184,14 +186,15 @@ constexpr auto BetweenPair(char o, char c)
 				}
 
 				vec.push_back(s[i]);
-			}
+			}*/
 
 			if (index == -1)
 			{
 				return std::nullopt;
 			}
 			std::string str = std::string(vec.begin(), vec.end());
-			return std::make_pair(str, s.substr(index + 1));
+            return std::make_pair(str, ParserInput(s.begin() + index + 1, s.end()));
+			//return std::make_pair(str, s.substr(index + 1));
 		};
 }
 
@@ -567,11 +570,6 @@ constexpr auto ManyTill(PA a, PB end)
 		};
 }
 
-struct Pos
-{
-	int line;
-	int column;
-};
 
 enum class ReplyStatus
 {
@@ -582,7 +580,7 @@ enum class ReplyStatus
 template<std::forward_iterator TIterator>
 struct Iterator
 {
-	Pos Position;
+	ParserPos Position;
 	TIterator StdIterator;
 };
 

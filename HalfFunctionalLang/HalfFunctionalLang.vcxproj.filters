@@ -66,6 +66,9 @@
     <ClCompile Include="CodeGen\RegAlloc.cpp">
       <Filter>CodeGen</Filter>
     </ClCompile>
+    <ClCompile Include="Parser\Parser.cpp">
+      <Filter>Parser</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Parser\Parser.h">

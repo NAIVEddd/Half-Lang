@@ -142,6 +142,7 @@
     <ClCompile Include="IR\Symbol.cpp" />
     <ClCompile Include="Parser\CharParsers.cpp" />
     <ClCompile Include="Parser\Operator.cpp" />
+    <ClCompile Include="Parser\Parser.cpp" />
     <ClCompile Include="Parser\Primitives.cpp" />
     <ClCompile Include="Syntax\Base.cpp" />
   </ItemGroup>

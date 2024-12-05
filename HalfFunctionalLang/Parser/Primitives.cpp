@@ -1,14 +1,14 @@
 #include "Primitives.h"
 
-template<typename TResult, std::forward_iterator TIterator>
-inline Reply<TResult, TIterator>::Reply(TResult Result_, TIterator Iterator_)
-{
-}
+//template<typename TResult, std::forward_iterator TIterator>
+//inline Reply<TResult, TIterator>::Reply(TResult Result_, TIterator Iterator_)
+//{
+//}
 
-template<typename TResult, std::forward_iterator TIterator>
-Reply<TResult, TIterator>::Reply(ReplyStatus Status_, std::list<std::string>&& ErrorMessage_)
-{
-}
+//template<typename TResult, std::forward_iterator TIterator>
+//Reply<TResult, TIterator>::Reply(ReplyStatus Status_, std::list<std::string>&& ErrorMessage_)
+//{
+//}
 
 bool IsAnyChar(char c)
 {
@@ -77,8 +77,8 @@ PKeyword::~PKeyword()
 {
 }
 
-Reply<std::string, std::string::iterator> PKeyword::Parse(Iterator<std::string::iterator>&& Iterator_)
-{
-    
-    return Reply<std::string, std::string::iterator>(std::string(), std::string::iterator());
-}
+//Reply<std::string, std::string::iterator> PKeyword::Parse(Iterator<std::string::iterator>&& Iterator_)
+//{
+//    
+//    return Reply<std::string, std::string::iterator>(std::string(), std::string::iterator());
+//}

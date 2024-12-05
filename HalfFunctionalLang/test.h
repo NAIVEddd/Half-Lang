@@ -1,5 +1,6 @@
 #pragma once
 #include<string>
+#include"Parser/Parser.h"
 #include"Parser/Primitives.h"
 #include"Parser/CharParsers.h"
 #include"Parser/Operator.h"
@@ -242,12 +243,12 @@ void test_parser_function()
         Parser<char> sep = MakeCharParser(',');
         Parser<std::vector<char>> pSep = SepBy(charParser, sep);
         Parser<std::vector<char>> pSepEndBy = SepEndBy(charParser, sep);
-        auto end1 = pSep("a,");
-        auto end2 = pSepEndBy("a,");
+        auto end1 = pSep(std::string("a,"));
+        auto end2 = pSepEndBy(std::string("a,"));
 
-        if (pSep("a,b,c") && pSep("a") &&
-            end1.value().second.size() == 1 &&
-            end2.value().second.size() == 0)
+        if (pSep(std::string("a,b,c")) && pSep(std::string("a")) &&
+            (not end1.value().second.empty()) &&
+            end2.value().second.empty())
         {
             printf("Parser SepBy success\n");
         }
@@ -320,10 +321,10 @@ void test_syntax_parser()
 
         auto res = p_id_space(prog1);
         _ASSERT(res);
-        _ASSERT(res.value().second.size() == 0);
+        _ASSERT(res.value().second.empty());
         res = p_space_id(prog1);
         _ASSERT(res);
-        _ASSERT(res.value().second.size() == 1);
+        _ASSERT(not res.value().second.empty());
     }
 
 
@@ -433,7 +434,7 @@ void test_expr_parser()
         auto c1 = pchar(prog1);
         _ASSERT(c1);
 
-        std::string prog2 = "'\n'";
+        std::string prog2 = "'\\n'";
         auto c2 = pchar(prog2);
         _ASSERT(c2);
 
@@ -654,7 +655,7 @@ void test_expr_parser()
         std::string prog1 = "if a then 1 else 0 end";
         auto i1 = pif(prog1);
         _ASSERT(i1);
-        _ASSERT(i1.value().second.size() == 0);
+        _ASSERT(i1.value().second.empty());
     }
 
     // test function
@@ -662,12 +663,12 @@ void test_expr_parser()
         std::string prog1 = "function print() = abc + 123 end";
         auto f1 = pdeffunc(prog1);
         _ASSERT(f1);
-        _ASSERT(f1.value().second.size() == 0);
+        _ASSERT(f1.value().second.empty());
 
         std::string prog2 = "function print(a int, b char) = a - b end";
         auto f2 = pdeffunc(prog2);
         _ASSERT(f2);
-        _ASSERT(f2.value().second.size() == 0);
+        _ASSERT(f2.value().second.empty());
     }
 
     // test def type
@@ -675,12 +676,12 @@ void test_expr_parser()
         std::string prog = "type any = {any:int}";
         auto t1 = pdeftype(prog);
         _ASSERT(t1);
-        _ASSERT(t1.value().second.size() == 0);
+        _ASSERT(t1.value().second.empty());
 
         std::string prog2 = "type list = {first:int, rest:list}";
         auto t2 = pdeftype(prog2);
         _ASSERT(t2);
-        _ASSERT(t2.value().second.size() == 0);
+        _ASSERT(t2.value().second.empty());
     }
 
     // test let
@@ -690,7 +691,7 @@ void test_expr_parser()
             std::string prog1 = "let a = 0";
             auto l1 = plet(prog1);
             _ASSERT(l1);
-            _ASSERT(l1.value().second.size() == 0);
+            _ASSERT(l1.value().second.empty());
         }
     }
 
@@ -701,12 +702,12 @@ void test_expr_parser()
             std::string prog1 = "for i = 0 to 10 do i end";
             auto f1 = pfor(prog1);
             _ASSERT(f1);
-            _ASSERT(f1.value().second.size() == 0);
+            _ASSERT(f1.value().second.empty());
 
             std::string prog2 = "for i = 10 downto -10 do i end";
             auto f2 = pfor(prog2);
             _ASSERT(f2);
-            _ASSERT(f2.value().second.size() == 0);
+            _ASSERT(f2.value().second.empty());
 
             std::string prog3 = "for i = 10 downto -10 do print(i) end";
             auto f3 = pfor(prog3);
@@ -725,9 +726,47 @@ void test_expr_parser()
     }
 }
 
+void test_parserinput()
+{
+    std::string prog1 =
+R"(function square(n int) =
+    let x = n * n
+    x
+end)";
+    /* {
+        _ParserInput p1(prog1);
+        _ASSERT(p1[0] == 'f');
+        _ASSERT(p1[1] == 'u');
+        _ASSERT(p1[25] == ' ');
+        _ASSERT(p1[29] == 'e');
+        _ASSERT(p1[30] == 't');
+        p1.current_pos.column = 10;
+        _ASSERT(p1[0] == 'q');
+        p1.current_pos.line = 3;
+        _ASSERT(p1[10] == '\0');
+    }*/
+    {
+        _ParserInput p1(prog1);
+        std::string func = "function";
+        auto it = p1.begin();
+        _ASSERT(*it == 'f');
+        for (size_t i = 0; i < func.size(); i++)
+        {
+            _ASSERT(*it == func[i]);
+            ++it;
+        }
+        it = p1.begin();
+        for (size_t i = 0; i < func.size(); i++)
+        {
+            _ASSERT(*it == func[i]);
+            it++;
+        }
+    }
+}
+
 void test_ir()
 {
-    /* {
+    {
         std::string prog1 = "999";
         auto e1 = pexpr(prog1);
         _ASSERT(e1);
@@ -759,7 +798,7 @@ void test_ir()
 
         auto ir = Trans_Expr(f1.value().first);
         auto exp = ir.exp;
-    }*/
+    }
 
     /* {
         std::string prog1 = "	\
@@ -813,12 +852,10 @@ void test_ir()
         RegAlloc regalloc;
         regalloc.allocate(g, live);
 
-        printf("\n");
+        /*printf("\n");
         for (size_t i = 0; i < g.instrs.size(); i++)
         {
             printf("%s", to_string(g.instrs[i]).c_str());
-        }
-
-        printf("\nCount %zd", g.Nodes.size());
+        }*/
     }
 }

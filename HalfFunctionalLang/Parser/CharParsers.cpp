@@ -6,6 +6,50 @@ ParserResult<char> OneChar(ParserInput s)
 	{
 		return std::nullopt;
 	}
+    auto iter = s.begin();
+    auto end = s.end();
+	if (*iter == '\\')
+	{
+		++iter;
+		if (iter == end)
+		{
+			return std::nullopt;
+		}
+		if (*iter == 'n')
+		{
+			return std::make_pair('\n', ParserInput(iter + 1, end));
+		}
+		if (*iter == 't')
+		{
+			return std::make_pair('\t', ParserInput(iter + 1, end));
+		}
+		if (*iter == 'r')
+		{
+			return std::make_pair('\r', ParserInput(iter + 1, end));
+		}
+		if (*iter == '0')
+		{
+			return std::make_pair('\0', ParserInput(iter + 1, end));
+		}
+		if (*iter == '\\')
+		{
+			return std::make_pair('\\', ParserInput(iter + 1, end));
+		}
+		if (*iter == '\'')
+		{
+			return std::make_pair('\'', ParserInput(iter + 1, end));
+		}
+		if (*iter == '\"')
+		{
+			return std::make_pair('\"', ParserInput(iter + 1, end));
+		}
+		
+        // todo: other escape characters
+        // hex character?
+        // octal character?
+
+        // unicode character?
+	}
 	return std::make_pair(s[0], ParserInput(s.begin() + 1, s.end()));
 }
 
@@ -127,7 +171,7 @@ Parser<char> Eof()
 {
 	return [](ParserInput s) -> ParserResult<char>
 		{
-			if (s.size() == 0)
+			if (s.empty())
 			{
 				return std::make_pair(' ', s);
 			}
@@ -135,14 +179,29 @@ Parser<char> Eof()
 		};
 }
 
+bool starts_with(ParserInput s, std::string_view prefix)
+{
+    auto iter = s.begin();
+    auto end = s.end();
+	for (size_t i = 0; i < prefix.size(); i++)
+	{
+		if (iter == end || *iter != prefix[i])
+		{
+			return false;
+		}
+		++iter;
+	}
+    return true;
+}
+
 Parser<std::string> String(std::string str)
 {
 	return [=](ParserInput s) -> ParserResult<std::string>
 		{
-			if (s.starts_with(str))
+			if (starts_with(s, str))
 			{
 				return std::make_pair(str,
-					std::string_view(s.data() + str.size(), s.size() - str.size()));
+					ParserInput(s.begin() + str.size(), s.end()));
 			}
 			return std::nullopt;
 		};
