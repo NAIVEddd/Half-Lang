@@ -145,6 +145,8 @@
     <ClCompile Include="Parser\Parser.cpp" />
     <ClCompile Include="Parser\Primitives.cpp" />
     <ClCompile Include="Syntax\Base.cpp" />
+    <ClCompile Include="Syntax\ExprParser.cpp" />
+    <ClCompile Include="Syntax\TypeCheck.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CodeGen\Assem.h" />
@@ -163,6 +165,7 @@
     <ClInclude Include="Parser\Primitives.h" />
     <ClInclude Include="Syntax\Base.h" />
     <ClInclude Include="Syntax\ExprParser.h" />
+    <ClInclude Include="Syntax\TypeCheck.h" />
     <ClInclude Include="test.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

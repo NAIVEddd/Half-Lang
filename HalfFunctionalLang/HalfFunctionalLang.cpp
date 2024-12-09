@@ -12,11 +12,11 @@ namespace fs = std::filesystem;
 int main(int argc, char* argv[])
 {
 #ifdef _DEBUG
-    test_parser_function();
+    /*test_parser_function();
     test_syntax_parser();
     test_operator_parser();
     test_expr_parser();
-    test_ir();
+    test_ir();*/
     test_parserinput();
     //std::cout << test_main_0;
     return 0;

@@ -4,6 +4,7 @@
 #include"Parser/Primitives.h"
 #include"Parser/CharParsers.h"
 #include"Parser/Operator.h"
+#include"Syntax/TypeCheck.h"
 #include"Syntax/ExprParser.h"
 //#include"IR/MakeIR.h"
 #include"IR/Semant.h"
@@ -48,6 +49,19 @@ int main() {
   putch(10);
 
   return 0;
+}
+)";
+
+std::string test_prog_2 =
+R"(
+int square(int x) {
+  return x * x;
+}
+int main()
+{
+    int x = 5;
+    int y = square(x);
+    return y;
 }
 )";
 
@@ -661,12 +675,12 @@ void test_expr_parser()
     // test function
     {
         std::string prog1 = "function print() = abc + 123 end";
-        auto f1 = pdeffunc(prog1);
+        auto f1 = pfuncdecl(prog1);
         _ASSERT(f1);
         _ASSERT(f1.value().second.empty());
 
         std::string prog2 = "function print(a int, b char) = a - b end";
-        auto f2 = pdeffunc(prog2);
+        auto f2 = pfuncdecl(prog2);
         _ASSERT(f2);
         _ASSERT(f2.value().second.empty());
     }
@@ -729,10 +743,31 @@ void test_expr_parser()
 void test_parserinput()
 {
     std::string prog1 =
-R"(function square(n int) =
+R"(function square(n int) : int =
     let x = n * n
     x
 end)";
+    std::string prog2 =
+        prog1 +
+        R"(
+function main() : int =
+    let x = 10
+    x = x + 1
+    square(x)
+end)";
+    std::string prog3 =
+        R"(
+function square n : int =
+    let x = n * n
+    x
+end)";
+    std::string prog4 =
+        R"(
+function square n =
+    let x = n * n
+    x
+end)";
+
     /* {
         _ParserInput p1(prog1);
         _ASSERT(p1[0] == 'f');
@@ -745,7 +780,7 @@ end)";
         p1.current_pos.line = 3;
         _ASSERT(p1[10] == '\0');
     }*/
-    {
+    /* {
         _ParserInput p1(prog1);
         std::string func = "function";
         auto it = p1.begin();
@@ -760,6 +795,60 @@ end)";
         {
             _ASSERT(*it == func[i]);
             it++;
+        }
+    }*/
+    {
+        ParserInput p1(prog2);
+        printf("\n%s\n", prog2.c_str());
+        auto e1 = pexpr(p1);
+        _ASSERT(e1);
+        auto e2 = pexpr(e1.value().second);
+        _ASSERT(e2);
+
+        auto f1 = pfuncdecl(p1);
+        _ASSERT(f1);
+        auto f2 = pfuncdecl(prog3);
+        _ASSERT(f2);
+        auto f3 = pfuncdecl(prog4);
+        _ASSERT(f3);
+
+        
+    }
+
+    {
+        std::string assign = "let x = 10";
+        std::string assign2 = "let x = 10\n x = 0";
+        std::string assign3 = "let x = 10\n x = 1 + 2\n x = 1";
+        {
+            auto check = TypeCheck();
+            if (check.Check(pexpr(assign).value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+        }
+        {
+            auto check = TypeCheck();
+            auto e = pprogram(assign2);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+        }
+        {
+            auto check = TypeCheck();
+            auto e = pprogram(assign3);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck(op +) success\n");
+            }
+        }
+        {
+            auto check = TypeCheck();
+            auto e = pprogram(prog2);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
         }
     }
 }

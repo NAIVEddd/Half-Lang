@@ -31,21 +31,40 @@ struct Half_While;
 struct Half_Define;
 struct Def_Type;
 struct Def_Func;
+struct Half_FuncDecl;
+struct Half_TypeDecl;
+
+// function declaration
+// name, parameters, return type, body
+//  function should support template
+
+// binary operator (type, operator, left, right)
+// type definition
+//  basic type (char, int, float, string)
+//  array type (type, count)
+//  struct(record) type (name, fields)
+//  rename type (name)
+//  function type (parameters, return type)
+// variable definition
+// return statement (type, value) // maybe not needed
+
 
 struct Half_Expr
 {
     using Expr = std::variant<
-        std::shared_ptr<Half_Var>,
-        std::shared_ptr<Half_Value>,
-        std::shared_ptr<Half_Function>,
+        std::shared_ptr<Half_Var>,    // rename to VarDecl
+        std::shared_ptr<Half_Value>,    // rename to ValueLiteral
+        //std::shared_ptr<Half_Function>,// deprecated, use FunctionDecl instead
         std::shared_ptr<Half_Funcall>,
         std::shared_ptr<Half_Op>,
-        std::shared_ptr<Half_Assign>,
-        std::shared_ptr<Def_Func>,
-        std::shared_ptr<Half_Let>,
+        std::shared_ptr<Half_Assign>,// deprecated, use VarDecl instead
+        std::shared_ptr<Def_Func>,  // deprecated, use FunctionDecl instead
+        std::shared_ptr<Half_Let>,  // deprecated, use VarDecl|FunctionDecl instead
         std::shared_ptr<Half_If>,
         std::shared_ptr<Half_For>,
         std::shared_ptr<Half_While>,
+        std::shared_ptr<Half_FuncDecl>,
+        std::shared_ptr<Half_TypeDecl>,
         std::shared_ptr<std::vector<Half_Expr>>>;
 
     Half_Expr() = default;
@@ -170,6 +189,158 @@ struct Def_Func
     Def_Func(const Def_Func& o);
     Def_Func& operator=(const Def_Func& o);
 };
+
+struct Half_FuncDecl
+{
+    struct TypeField
+    {
+        std::string var_name;
+        std::string type_name;
+    };
+    std::string name;
+    std::vector<TypeField> parameters;
+    std::string return_type;
+    Half_Expr body;
+    Half_FuncDecl() = default;
+    Half_FuncDecl(std::string n, std::vector<TypeField>& p, std::string r, Half_Expr b)
+        : name(std::move(n)), parameters(std::move(p)), return_type(std::move(r)), body(std::move(b)) {}
+    Half_FuncDecl(const Half_FuncDecl& o) = default;
+    Half_FuncDecl& operator=(const Half_FuncDecl& o) = default;
+};
+
+struct Half_TypeDecl
+{
+    /*struct UnknowType
+    {
+        char dummy;
+    };*/
+    struct BasicType
+    {
+        enum class BasicT
+        {
+            Char, Int, Float, String
+        };
+        BasicT type_name;
+        BasicType() = default;
+        BasicType(BasicT t) : type_name(t) {}
+        BasicType(const BasicType& o) : type_name(o.type_name) {}
+        BasicType& operator=(const BasicType& o)
+        {
+            type_name = o.type_name;
+            return *this;
+        }
+        bool operator==(const BasicType& o) const
+        {
+            return type_name == o.type_name;
+        }
+        bool operator!=(const BasicType& o) const
+        {
+            return type_name != o.type_name;
+        }
+        static bool is_basic_t(const Half_Value& v);
+    };
+    struct RenameType
+    {
+        std::string original_name;
+        bool operator==(const RenameType& o) const
+        {
+            return original_name == o.original_name;
+        }
+        bool operator!=(const RenameType& o) const
+        {
+            return original_name != o.original_name;
+        }
+    };
+    struct ArrayType
+    {
+        std::string type_name;
+        int count;
+        ArrayType(std::string t, int c) : type_name(t), count(c) {}
+        ArrayType(const ArrayType& o) : type_name(o.type_name), count(o.count) {}
+        ArrayType& operator=(const ArrayType& o)
+        {
+            type_name = o.type_name;
+            count = o.count;
+            return *this;
+        }
+        bool operator==(const ArrayType& o) const
+        {
+            return type_name == o.type_name && count == o.count;
+        }
+        bool operator!=(const ArrayType& o) const
+        {
+            return !(*this == o);
+        }
+    };
+    struct StructType
+    {
+        struct TypePair
+        {
+            std::string name;
+            std::string type;
+            TypePair(std::string n, std::string t) : name(n), type(t) {}
+            TypePair(const TypePair& o) : name(o.name), type(o.type) {}
+        };
+        std::string name;
+        std::vector<TypePair> field_list;
+        StructType(std::string n, std::vector<TypePair>& f) : name(n), field_list(f) {}
+        StructType(const StructType& o) : name(o.name), field_list(o.field_list) {}
+        StructType& operator=(const StructType& o)
+        {
+            name = o.name;
+            field_list = o.field_list;
+            return *this;
+        }
+        bool operator==(const StructType& o) const
+        {
+            return name == o.name;//&& field_list == o.field_list;
+        }
+        bool operator!=(const StructType& o) const
+        {
+            return !(*this == o);
+        }
+    };
+    struct FuncType
+    {
+        struct TypeField
+        {
+            std::string var_name;
+            std::string type_name;
+        };
+        std::vector<TypeField> parameters;
+        std::string return_type;
+        FuncType(std::vector<TypeField>& p, std::string r) : parameters(p), return_type(r) {}
+        FuncType(const FuncType& o) : parameters(o.parameters), return_type(o.return_type) {}
+        FuncType& operator=(const FuncType& o)
+        {
+            parameters = o.parameters;
+            return_type = o.return_type;
+            return *this;
+        }
+        bool operator==(const FuncType& o) const
+        {
+            return return_type == o.return_type;// parameters == o.parameters && return_type == o.return_type;
+        }
+        bool operator!=(const FuncType& o) const
+        {
+            return !(*this == o);
+        }
+    };
+    using Type = std::variant<std::monostate, BasicType, RenameType, ArrayType, StructType, FuncType>;
+    //using Type = std::variant<UnknowType, BasicType, RenameType, ArrayType, StructType, FuncType>;
+    Type type;
+    Half_TypeDecl() = default;
+    Half_TypeDecl(const BasicType& t);
+    Half_TypeDecl(const RenameType& t);
+    Half_TypeDecl(const ArrayType& t);
+    Half_TypeDecl(const StructType& t);
+    Half_TypeDecl(const FuncType& t);
+    Half_TypeDecl(const Half_TypeDecl& o);
+    Half_TypeDecl& operator=(const Half_TypeDecl& o);
+    bool operator==(const Half_TypeDecl& o) const;
+    bool operator!=(const Half_TypeDecl& o) const;
+};
+
 
 struct Def_Type
 {

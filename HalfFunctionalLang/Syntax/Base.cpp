@@ -250,3 +250,59 @@ Def_Func& Def_Func::operator=(const Def_Func& o)
     func_body = o.func_body;
     return *this;
 }
+
+Half_TypeDecl::Half_TypeDecl(const BasicType& t)
+    : type(t)
+{
+}
+
+Half_TypeDecl::Half_TypeDecl(const RenameType& t)
+    : type(t)
+{
+}
+
+Half_TypeDecl::Half_TypeDecl(const ArrayType& t)
+    : type(t)
+{
+}
+
+Half_TypeDecl::Half_TypeDecl(const StructType& t)
+    : type(t)
+{
+}
+
+Half_TypeDecl::Half_TypeDecl(const FuncType& t)
+    : type(t)
+{
+}
+
+Half_TypeDecl::Half_TypeDecl(const Half_TypeDecl& o)
+    : type(o.type)
+{
+}
+
+Half_TypeDecl& Half_TypeDecl::operator=(const Half_TypeDecl& o)
+{
+    type = o.type;
+    return *this;
+}
+
+bool Half_TypeDecl::operator==(const Half_TypeDecl& o) const
+{
+    return type == o.type;
+}
+
+bool Half_TypeDecl::operator!=(const Half_TypeDecl& o) const
+{
+    return !(*this == o);
+}
+
+bool Half_TypeDecl::BasicType::is_basic_t(const Half_Value& v)
+{
+    auto idx = v.value.index();
+    if (idx >= 0 && idx < 4)
+    {
+        return true;
+    }
+    return false;
+}

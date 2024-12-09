@@ -69,6 +69,12 @@
     <ClCompile Include="Parser\Parser.cpp">
       <Filter>Parser</Filter>
     </ClCompile>
+    <ClCompile Include="Syntax\TypeCheck.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Syntax\ExprParser.cpp">
+      <Filter>Syntax</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Parser\Parser.h">
@@ -121,6 +127,9 @@
     </ClInclude>
     <ClInclude Include="CodeGen\RegAlloc.h">
       <Filter>CodeGen</Filter>
+    </ClInclude>
+    <ClInclude Include="Syntax\TypeCheck.h">
+      <Filter>Syntax</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
