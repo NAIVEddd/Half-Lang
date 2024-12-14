@@ -851,6 +851,70 @@ end)";
             }
         }
     }
+    {
+        {
+            Builder b;
+            auto check = TypeCheck();
+            auto e = pprogram(prog1);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+            auto ir = Trans_Expr(e.value().first);
+            auto exp = ir.exp;
+            std::vector<AS_Instr> instrs;
+            /*MunchExp(ir, instrs);
+            printf("\nCount %zd\n", instrs.size());
+
+            // generate graph
+            auto g = Graph();
+            g.initialize(instrs);
+            auto live = Liveness();
+            live.initialize(g);
+            printf("\nCount %zd\n", g.Nodes.size());
+            auto rlive = Liveness();
+            rlive.rinitialize(g);
+            live == rlive;
+            Color color(8);
+            color.initialize(live);
+            color.allocate();
+            color.print();
+            RegAlloc regalloc;
+            regalloc.allocate(g, live);
+            for (size_t i = 0; i < g.instrs.size(); i++)
+            {
+                printf("%s", to_string(g.instrs[i]).c_str());
+            }*/
+
+            auto ir_name = Trans_Expr(e.value().first, b);
+            printf("\n%s\n", to_string(ir_name.name).c_str());
+            auto exps = b.GetBlock(0).exps[0];
+            MunchExp_llvmlike(exps, instrs);
+            printf("\nCount %zd\n", instrs.size());
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                printf("%s", to_string(instrs[i]).c_str());
+            }
+            auto g = Graph();
+            g.initialize(instrs);
+            auto live = Liveness();
+            live.initialize(g);
+            printf("\nCount %zd\n", g.Nodes.size());
+            auto rlive = Liveness();
+            rlive.rinitialize(g);
+            live == rlive;
+            Color color(8);
+            color.initialize(live);
+            color.allocate();
+            color.print();
+            RegAlloc regalloc;
+            regalloc.allocate(g, live);
+            for (size_t i = 0; i < g.instrs.size(); i++)
+            {
+                printf("%s", to_string(g.instrs[i]).c_str());
+            }
+        }
+    }
 }
 
 void test_ir()

@@ -309,6 +309,7 @@ struct Half_TypeDecl
         };
         std::vector<TypeField> parameters;
         std::string return_type;
+        FuncType() = default;
         FuncType(std::vector<TypeField>& p, std::string r) : parameters(p), return_type(r) {}
         FuncType(const FuncType& o) : parameters(o.parameters), return_type(o.return_type) {}
         FuncType& operator=(const FuncType& o)

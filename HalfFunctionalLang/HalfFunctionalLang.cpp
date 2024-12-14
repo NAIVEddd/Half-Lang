@@ -7,12 +7,93 @@
 #include <filesystem>
 #include <functional>
 
+#include <iostream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+
+// 三地址代码表示
+struct ThreeAddressCode {
+    std::string op;
+    std::string arg1;
+    std::string arg2;
+    std::string result;
+};
+
+// x86汇编指令表示
+struct X86Instruction {
+    std::string op;
+    std::string arg1;
+    std::string arg2;
+};
+
+// 寄存器分配
+std::unordered_map<std::string, std::string> registerAllocation = {
+    {"t1", "eax"},
+    {"t2", "ebx"},
+    {"a", "ecx"},
+    {"b", "edx"},
+    {"c", "esi"},
+    {"d", "edi"}
+};
+
+// 将三地址代码转换为x86汇编指令
+std::vector<X86Instruction> generateX86Assembly(const std::vector<ThreeAddressCode>& tac) {
+    std::vector<X86Instruction> instructions;
+
+    for (const auto& code : tac) {
+        if (code.op == "+") {
+            instructions.push_back({ "mov", registerAllocation[code.arg1], registerAllocation[code.result] });
+            instructions.push_back({ "add", registerAllocation[code.arg2], registerAllocation[code.result] });
+        }
+        else if (code.op == "*") {
+            instructions.push_back({ "mov", registerAllocation[code.arg1], registerAllocation[code.result] });
+            instructions.push_back({ "imul", registerAllocation[code.arg2], registerAllocation[code.result] });
+        }
+        else if (code.op == "=") {
+            instructions.push_back({ "mov", registerAllocation[code.arg1], registerAllocation[code.result] });
+        }
+    }
+
+    return instructions;
+}
+
+// 输出x86汇编代码
+void printX86Assembly(const std::vector<X86Instruction>& instructions) {
+    for (const auto& instr : instructions) {
+        std::cout << instr.op << " " << instr.arg1;
+        if (!instr.arg2.empty()) {
+            std::cout << ", " << instr.arg2;
+        }
+        std::cout << std::endl;
+    }
+}
+
+int trans_three_address_code() {
+    // 示例三地址代码
+    std::vector<ThreeAddressCode> tac = {
+        {"+", "a", "b", "t1"},
+        {"*", "t1", "c", "t2"},
+        {"=", "t2", "", "d"}
+    };
+
+    // 生成x86汇编指令
+    std::vector<X86Instruction> instructions = generateX86Assembly(tac);
+
+    // 输出x86汇编代码
+    printX86Assembly(instructions);
+
+    return 0;
+}
+
+
 namespace fs = std::filesystem;
 
 int main(int argc, char* argv[])
 {
 #ifdef _DEBUG
-    /*test_parser_function();
+    /*trans_three_address_code();
+    test_parser_function();
     test_syntax_parser();
     test_operator_parser();
     test_expr_parser();

@@ -2,6 +2,7 @@
 
 #include"../Syntax/Base.h"
 #include"Temp.h"
+#include"BasicBlock.h"
 #include<map>
 
 //struct Half_Ir;
@@ -11,6 +12,7 @@ struct Half_Ir_Const;
 struct Half_Ir_Name;
 struct Half_Ir_Call;
 struct Half_Ir_BinOp;
+struct Half_Ir_LlvmBinOp;
 struct Half_Ir_Memory;
 struct Half_Ir_Branch;
 struct Half_Ir_Func;
@@ -22,6 +24,8 @@ struct Half_Ir_Load;
 struct Half_Ir_Store;
 struct Half_Ir_Alloc;
 struct Half_Ir_Return;
+struct Half_Ir_Value;
+struct Half_Ir_Function;
 
 struct Half_Ir_Exp
 {
@@ -32,9 +36,12 @@ struct Half_Ir_Exp
         std::shared_ptr<Half_Ir_Store>,
         std::shared_ptr<Half_Ir_Alloc>,
         std::shared_ptr<Half_Ir_Return>,
+        std::shared_ptr<Half_Ir_Function>,
         std::shared_ptr<Half_Ir_Name>,
+        std::shared_ptr<Half_Ir_Value>,
         std::shared_ptr<Half_Ir_Call>,
         std::shared_ptr<Half_Ir_BinOp>,
+        std::shared_ptr<Half_Ir_LlvmBinOp>,
         std::shared_ptr<Half_Ir_Memory>,
         std::shared_ptr<Half_Ir_Branch>,
         std::shared_ptr<Half_Ir_Func>,
@@ -54,27 +61,36 @@ struct Half_Ir_Exp
 struct Half_Ir_Const
 {
     int n;
+    Half_Ir_Const() = default;
     Half_Ir_Const(int x) : n(x) {}
-};
-
-struct Half_Ir_Load
-{
-    size_t size;
-    Temp::Label label;
-    Half_Ir_Load(size_t sz, Temp::Label l) : size(sz), label(l) {}
-    Half_Ir_Load(const Half_Ir_Load& load) : size(load.size), label(load.label) {}
-};
-
-struct Half_Ir_Store
-{
-
 };
 
 struct Half_Ir_Alloc
 {
-    size_t size;
-    Half_Ir_Alloc(size_t s) : size(s) {}
-    Half_Ir_Alloc(const Half_Ir_Alloc& a) : size(a.size) {}
+    size_t offset;
+    Temp::Label out_label;
+    Half_Ir_Alloc(size_t off, Temp::Label l) : offset(off), out_label(l) {}
+    Half_Ir_Alloc(const Half_Ir_Alloc& a) : offset(a.offset), out_label(a.out_label) {}
+};
+
+struct Half_Ir_Load
+{
+    //size_t size;  // size of the data(4 bytes, 8 bytes, ...) maybe it should be a type
+    size_t offset;
+    Temp::Label out_label;
+    Half_Ir_Load(size_t off, Temp::Label l) : offset(off), out_label(l) {}
+    Half_Ir_Load(const Half_Ir_Load& load) : offset(load.offset), out_label(load.out_label) {}
+};
+
+struct Half_Ir_Store
+{
+    // store data to memory
+    //   data maybe a register or a constant
+    std::variant<size_t, Half_Ir_Const> data;
+    Temp::Label in_label;
+    Half_Ir_Store(size_t off, Temp::Label l) : data(off), in_label(l) {}
+    Half_Ir_Store(Half_Ir_Const c, Temp::Label l) : data(c), in_label(l) {}
+    Half_Ir_Store(const Half_Ir_Store& store) : data(store.data), in_label(store.in_label) {}
 };
 
 struct Half_Ir_Return
@@ -84,10 +100,51 @@ struct Half_Ir_Return
     Half_Ir_Return(const Half_Ir_Return& e) : value(e.value) {}
 };
 
+struct Half_Ir_Function
+{
+    std::string name;
+    Half_TypeDecl::FuncType type;
+    std::vector<Half_FuncDecl::TypeField> args;
+
+    std::vector<Half_Ir_BasicBlock> blocks;
+    Half_Ir_Function() = default;
+    Half_Ir_Function(std::string n, Half_TypeDecl::FuncType t, std::vector<Half_FuncDecl::TypeField>& a)
+        : name(n), type(t), args(a) {}
+};
+
 struct Half_Ir_Name
 {
-    Temp name;
-    Half_Ir_Name(Temp n) : name(n) {}
+    Temp::Label name;
+    Half_Ir_Name() : name(Temp::Label("Invalid Value")) {}
+    Half_Ir_Name(std::string n) : name(Temp::Label(n)) {}
+    Half_Ir_Name(Temp::Label n) : name(n) {}
+    Half_Ir_Name(const Half_Ir_Name& n) : name(n.name) {}
+};
+
+struct Half_Ir_Value
+{
+    std::variant<Half_Ir_Const, Half_Ir_Name> val;
+    Half_Ir_Value(Half_Ir_Const c) : val(c) {}
+    Half_Ir_Value(Half_Ir_Name n) : val(n) {}
+    Half_Ir_Value(const Half_Ir_Value& o) : val(o.val) {}
+    Half_Ir_Const GetConst()
+    {
+        if (auto p = std::get_if<Half_Ir_Const>(&val))
+        {
+            return *p;
+        }
+        _ASSERT(false);
+        return Half_Ir_Const(-1);
+    }
+    Half_Ir_Name GetName()
+    {
+        if (auto p = std::get_if<Half_Ir_Name>(&val))
+        {
+            return *p;
+        }
+        _ASSERT(false);
+        return Half_Ir_Name();
+    }
 };
 
 struct Half_Ir_BinOp
@@ -118,6 +175,25 @@ struct Half_Ir_BinOp
             return Oper::Unknow;
         }
         return i->second;
+    }
+};
+
+struct Half_Ir_LlvmBinOp
+{
+    using Oper = Half_Ir_BinOp::Oper;
+    Oper op;
+    Half_Ir_Name left;
+    Half_Ir_Name right;
+    Temp::Label out_label;
+    Half_Ir_LlvmBinOp(std::string o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+        : op(GetOper(o)), left(l), right(r), out_label(out) {}
+    Half_Ir_LlvmBinOp(Oper o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+        : op(o), left(l), right(r), out_label(out) {}
+    Half_Ir_LlvmBinOp(const Half_Ir_LlvmBinOp& o)
+        : op(o.op), left(o.left), right(o.right), out_label(o.out_label) {}
+    static Oper GetOper(std::string s)
+    {
+        return Half_Ir_BinOp::GetOper(s);
     }
 };
 

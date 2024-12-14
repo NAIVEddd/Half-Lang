@@ -2,12 +2,14 @@
 
 #include"../IR/IR.h"
 #include"../IR/Temp.h"
+#include"../IR/Builder.h"
 #include<stack>
 
-struct AS_Alloc
+struct AS_StackAlloc
 {
     size_t bytes;
-    AS_Alloc(size_t sz) : bytes(sz) {}
+    AS_StackAlloc(size_t sz) : bytes(sz) {}
+    AS_StackAlloc(const AS_StackAlloc& a) : bytes(a.bytes) {}
 };
 
 struct AS_Oper
@@ -51,9 +53,19 @@ struct AS_Return
     char c;
 };
 
-using AS_Instr = std::variant<std::monostate, AS_Oper, AS_Move, AS_Jump, AS_Label, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_Jump, AS_Label, AS_Return>;
 
+struct AS_Function
+{
+    std::string name;
+    std::vector<AS_Instr> instrs;
+    AS_Function(std::string n, std::vector<AS_Instr>& i)
+        : name(n), instrs(i) {
+    }
+};
 
 void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
 void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<Temp::Label>& temps);
+void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
+void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<Temp::Label>& temps);
 std::string to_string(const AS_Instr& instr);

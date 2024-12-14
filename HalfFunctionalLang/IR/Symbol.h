@@ -95,9 +95,11 @@ struct Table
         return t->parent;
     }
 
-    void insert(Symbol s)
+    void insert(Symbol& s)
     {
-        s.offset = values.size() * 4;
+        // value at offset 0 is stack frame pointer
+        // so we start at offset 4
+        s.offset = (values.size() + 1) * 4;
         values.insert({ s.name, s });
     }
     void insert(FunctionSymbol f)

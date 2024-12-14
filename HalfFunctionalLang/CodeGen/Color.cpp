@@ -6,6 +6,14 @@ void Color::initialize(Liveness& liveness)
     color.resize(liveness.temps.size(), -1);
     degree.resize(liveness.temps.size());
     printf("Coloring initialize:\n");
+
+    // insert all temps into map
+    for (auto& l : liveness.temps)
+    {
+        tempMap.get(l);
+    }
+
+    // add edges
     for (int i = 0; i < liveness.in.size(); ++i)
     {
         std::vector<Temp::Label> in = { liveness.in[i].begin(), liveness.in[i].end() };
