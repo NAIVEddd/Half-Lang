@@ -94,5 +94,4 @@ void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
 void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<Temp::Label>& temps);
 void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs);
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
-void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<Temp::Label>& temps);
 std::string to_string(const AS_Instr& instr);

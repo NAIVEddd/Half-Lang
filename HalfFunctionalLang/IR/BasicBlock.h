@@ -38,13 +38,4 @@ struct Half_Ir_BasicBlock
     {
         label = l;
     }
-
-    //std::optional<Half_Ir_Exp> GetTerminator()
-    //{
-    //    if (exps.empty())   // or exps.back().exp is Half_Ir_Jump(terminator)
-    //    {
-    //        return std::nullopt;
-    //    }
-    //    return exps.back();
-    //}
 };

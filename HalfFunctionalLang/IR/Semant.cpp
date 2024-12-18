@@ -118,32 +118,7 @@ Half_Ir_Exp Trans_Assign(std::shared_ptr<Table>& table, Half_Assign& assign)
     auto l = Trans_Var(table, assign.left);
     auto r = Trans_Expr(table, assign.right);
     Default_builder.AddExp(Half_Ir_Move(l, r));
-    //return Half_Ir_Move(l, r);
     return l;
-}
-
-Half_Ir_Exp Trans_Deffunc(std::shared_ptr<Table>& table, Def_Func& func)
-{
-    FunctionSymbol funcSymb;
-    std::vector<Half_Ir_Exp> allocs;
-    auto funcscope = Table::begin_scope(table);
-
-    for (size_t i = 0; i < func.parameters.size(); i++)
-    {
-        Symbol smb;
-        smb.name = func.parameters[i].name;
-        funcscope->insert(smb);
-        funcscope->labels.insert({ smb.name, Temp::NewLabel(funcscope->labels.size()) });
-    }
-
-    funcSymb.name = func.name;
-    funcSymb.label = Temp::NewLabel(func.name);
-    funcSymb.scope = funcscope;
-    funcSymb.body = Trans_Expr(funcscope, func.func_body);
-
-    table->insert(funcSymb);
-    auto funLabel = Half_Ir_Label(Temp::Label(func.name));
-    return Half_Ir_Func(funLabel, funcSymb.body);
 }
 
 Half_Ir_Exp Trans_Let(std::shared_ptr<Table>& table, Half_Let& let)
@@ -157,14 +132,6 @@ Half_Ir_Exp Trans_Let(std::shared_ptr<Table>& table, Half_Let& let)
     //table->labels.insert({ s.name, Temp::NewLabel(table->labels.size()) });
     //return Half_Ir_Seq(std::vector<Half_Ir_Exp>{alloc, assign});
     return Trans_Assign(table, let.def);
-}
-
-Half_Ir_Exp Trans_If(std::shared_ptr<Table>& table, Half_If& _if)
-{
-    auto c = Trans_Expr(table, _if.condition);
-    auto t = Trans_Expr(table, _if.trueExpr);
-    auto f = Trans_Expr(table, _if.falseExpr);
-    return Half_Ir_Branch(c, t, f);
 }
 
 Half_Ir_Exp Trans_While(std::shared_ptr<Table>& table, Half_While& _while)
@@ -208,11 +175,6 @@ Half_Ir_Exp Trans_Expr(std::shared_ptr<Table>& table, Half_Expr& expr)
     {
         auto& let = **plet;
         return Trans_Let(table, let);
-    }
-    else if (auto pif = std::get_if<std::shared_ptr<Half_If>>(&expr.expr))
-    {
-        auto& _if = **pif;
-        return Trans_If(table, _if);
     }
     else if (auto pwhile = std::get_if<std::shared_ptr<Half_While>>(&expr.expr))
     {
@@ -300,16 +262,20 @@ Half_Ir_Name Trans_OpExpr_Builder(std::shared_ptr<Table>& table, Half_Op::Half_O
         auto& var = *pvar;
         return Trans_Var_Builder(table, var, builder);
     }
-    //else if (auto pvalue = std::get_if<Half_Value>(&op))
-    //{
-    //    auto& value = *pvalue;
-    //    return Trans_Value_Builder(table, value, builder);
-    //}
-    //else if (auto pfuncall = std::get_if<Half_Funcall>(&op))
-    //{
-    //    auto& funcall = *pfuncall;
-    //    return Trans_Funcall_Builder(table, funcall, builder);
-    //}
+    else if (auto pvalue = std::get_if<Half_Value>(&op))
+    {
+        auto& value = *pvalue;
+        auto value_expr = Half_Expr(value);
+        return Trans_Expr(table, builder, value_expr);
+        //return Trans_Value_Builder(table, value, builder);
+    }
+    else if (auto pfuncall = std::get_if<Half_Funcall>(&op))
+    {
+        auto& funcall = *pfuncall;
+        auto funcall_expr = Half_Expr(funcall);
+        return Trans_Expr(table, builder, funcall_expr);
+        //return Trans_Funcall_Builder(table, funcall, builder);
+    }
     else if (auto pop = std::get_if<Half_Op>(&op))
     {
         auto& binop = *pop;
@@ -384,12 +350,6 @@ Half_Ir_Name Trans_If_Cond(std::shared_ptr<Table>& table, Builder& builder, Half
         auto& op = **pop;
         Half_Op::Half_OpExpr temp_op = op;
         return Trans_CondOp(table, builder, temp_op, true_label, false_label);
-        /*auto l = Trans_CondOp(table, builder, *op.left, true_label, false_label);
-        auto r = Trans_CondOp(table, builder, *op.right, true_label, false_label);
-        auto cmp = Half_Ir_Compare(op.op, l, r, Temp::NewLabel());
-        auto br = Half_Ir_LlvmBranch(cmp, true_label, false_label);
-        builder.AddExp(br);
-        return cmp.out_label;*/
     }
     printf("only support binary op exp type in if.cond\n");
     _ASSERT(false);

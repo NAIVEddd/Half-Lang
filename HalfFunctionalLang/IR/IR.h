@@ -15,7 +15,6 @@ struct Half_Ir_BinOp;
 struct Half_Ir_LlvmBinOp;
 struct Half_Ir_Compare;
 struct Half_Ir_Memory;
-struct Half_Ir_Branch;
 struct Half_Ir_LlvmBranch;  // branch llvm like
 struct Half_Ir_Func;
 struct Half_Ir_Move;
@@ -45,9 +44,7 @@ struct Half_Ir_Exp
         std::shared_ptr<Half_Ir_Call>,
         std::shared_ptr<Half_Ir_BinOp>,
         std::shared_ptr<Half_Ir_LlvmBinOp>,
-        //std::shared_ptr<Half_Ir_Compare>,
         std::shared_ptr<Half_Ir_Memory>,
-        std::shared_ptr<Half_Ir_Branch>,
         std::shared_ptr<Half_Ir_LlvmBranch>,
         std::shared_ptr<Half_Ir_Func>,
         std::shared_ptr<Half_Ir_Move>,
@@ -272,15 +269,6 @@ struct Half_Ir_Memory
 {
     size_t offset;
     Half_Ir_Memory(size_t o) : offset(o) {}
-};
-
-struct Half_Ir_Branch
-{
-    Half_Ir_Exp Cond;
-    Half_Ir_Exp True;
-    Half_Ir_Exp False;
-    Half_Ir_Branch(Half_Ir_Exp condition, Half_Ir_Exp truee, Half_Ir_Exp falsee)
-        : Cond(condition), True(truee), False(falsee) {}
 };
 
 struct Half_Ir_Label

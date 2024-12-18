@@ -92,12 +92,12 @@ namespace fs = std::filesystem;
 int main(int argc, char* argv[])
 {
 #ifdef _DEBUG
-    /*trans_three_address_code();
+    trans_three_address_code();
     test_parser_function();
     test_syntax_parser();
     test_operator_parser();
     test_expr_parser();
-    test_ir();*/
+    test_ir();/**/
     test_parserinput();
     //std::cout << test_main_0;
     return 0;
@@ -107,7 +107,7 @@ int main(int argc, char* argv[])
     if (argc < 2) {
         fs::path p = fs::path(argv[0]);
         std::cerr << "Usage: " << p.filename() << " <input_file>" << std::endl;
-        //return 1;
+        return 1;
     }
 
     std::vector<std::string> args(argv, argv + argc);

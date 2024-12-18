@@ -160,38 +160,15 @@ void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs)
     for (size_t i = 0; i < builder.blocks.size(); i++)
     {
         auto& block = builder.blocks[i];
-        std::stack<Temp::Label> temps;
-        //MunchExp_llvmlike(Half_Ir_Label(block.label), instrs, temps);
         for (auto& exp : block.exps)
         {
             printf("\n");
-            MunchExp_llvmlike(exp, instrs, temps);
+            MunchExp_llvmlike(exp, instrs);
         }
     }
 }
 
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
-{
-    std::stack<Temp::Label> temps;
-    MunchExp_llvmlike(exp, instrs, temps);
-}
-
-void SeperateExp(std::vector<Half_Ir_Exp>& exps, std::vector<Half_Ir_Alloc>& allocs, std::vector<Half_Ir_Exp>& others)
-{
-    for (auto& e : exps)
-    {
-        if (auto palloc = std::get_if<std::shared_ptr<Half_Ir_Alloc>>(&e.exp))
-        {
-            allocs.push_back(**palloc);
-        }
-        else
-        {
-            others.push_back(e);
-        }
-    }
-}
-
-void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<Temp::Label>& temps)
 {
     if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&exp.exp))
     {
@@ -275,7 +252,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, st
                 }
                 else
                 {
-                    MunchExp_llvmlike(e, instrs, temps);
+                    MunchExp_llvmlike(e, instrs);
                 }
             }
         }
@@ -328,13 +305,6 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, st
         instrs.push_back(AS_Move(binop.out_label, movl));
         return;
     }
-    else if (auto pmem = std::get_if<std::shared_ptr<Half_Ir_Memory>>(&exp.exp))
-    {
-        printf("Half_Ir_Memory\n");
-        auto l = Temp::Label(std::to_string((*pmem)->offset + 4) + std::string("(%esp)"));
-        temps.push(l);
-        return;
-    }
     else if (auto pcall = std::get_if<std::shared_ptr<Half_Ir_Call>>(&exp.exp))
     {
         printf("Half_Ir_Call\n");
@@ -342,7 +312,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, st
         for (size_t i = 0; i < vec.size(); i++)
         {
             printf("        ");
-            MunchExp_llvmlike(vec[i], instrs, temps);
+            MunchExp_llvmlike(vec[i], instrs);
         }
         return;
     }

@@ -791,7 +791,7 @@ R"(function square(n int) : int =
 end)";
     std::string prog1_if =
 R"(function square_biger_20(n int) : int =
-    n + n
+    n + 10
     let x = n * n
     if x > 20 then
         x
@@ -961,8 +961,6 @@ end)";
             {
                 printf("TypeCheck success\n");
             }
-            /*auto ir = Trans_Expr(e.value().first);
-            auto exp = ir.exp;*/
             std::vector<AS_Instr> instrs;
 
             auto ir_name = Trans_Expr(e.value().first, b);
@@ -970,8 +968,6 @@ end)";
 
             MunchExps_llvmlike(b, instrs);
 
-            /*auto exps = b.GetBlock(0).exps[0];
-            MunchExp_llvmlike(exps, instrs);*/
             printf("\nCount %zd\n", instrs.size());
             for (size_t i = 0; i < instrs.size(); i++)
             {

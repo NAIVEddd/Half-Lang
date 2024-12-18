@@ -14,7 +14,7 @@ void Color::initialize(Liveness& liveness)
     }
 
     // add edges
-    for (int i = 0; i < liveness.in.size(); ++i)
+    for (size_t i = 0; i < liveness.in.size(); ++i)
     {
         std::vector<Temp::Label> in = { liveness.in[i].begin(), liveness.in[i].end() };
         for (size_t i = 0; i < in.size(); ++i)
@@ -34,8 +34,8 @@ void Color::initialize(Liveness& liveness)
     {
         if (adjList[i].empty())
         {
-            printf("    add self edge %s : %zd\n", tempMap.get(i).l.c_str(), i);
-            stack.push(i);
+            printf("    add self edge %s : %zd\n", tempMap.get((int)i).l.c_str(), i);
+            stack.push((int)i);
         }
     }
 }

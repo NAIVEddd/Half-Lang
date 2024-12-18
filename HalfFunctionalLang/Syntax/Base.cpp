@@ -246,26 +246,6 @@ Def_Type& Def_Type::operator=(const Def_Type& o)
     return *this;
 }
 
-Def_Func::Def_Func(std::string n, std::vector<TypeField>& p, std::string r, Half_Expr b)
-    : name(n), parameters(p), return_type(r), func_body(b)
-{
-}
-
-Def_Func::Def_Func(const Def_Func& o)
-    : name(o.name), parameters(o.parameters)
-    , return_type(o.return_type), func_body(o.func_body)
-{
-}
-
-Def_Func& Def_Func::operator=(const Def_Func& o)
-{
-    name = o.name;
-    parameters = o.parameters;
-    return_type = o.return_type;
-    func_body = o.func_body;
-    return *this;
-}
-
 Half_TypeDecl::Half_TypeDecl(const BasicType& t)
     : type(t)
 {

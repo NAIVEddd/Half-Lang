@@ -29,7 +29,6 @@ struct Half_For;
 struct Half_While;
 struct Half_Define;
 struct Def_Type;
-struct Def_Func;
 struct Half_FuncDecl;
 struct Half_TypeDecl;
 
@@ -56,7 +55,6 @@ struct Half_Expr
         std::shared_ptr<Half_Funcall>,
         std::shared_ptr<Half_Op>,
         std::shared_ptr<Half_Assign>,// deprecated, use VarDecl instead
-        //std::shared_ptr<Def_Func>,  // deprecated, use FunctionDecl instead
         std::shared_ptr<Half_Let>,  // deprecated, use VarDecl|FunctionDecl instead
         std::shared_ptr<Half_If>,
         std::shared_ptr<Half_For>,
@@ -198,23 +196,6 @@ struct Half_Assign
 };
 
 using Def_Var = Half_Assign;
-struct Def_Func
-{
-    struct TypeField
-    {
-        std::string name;
-        std::string type;
-    };
-    std::string name;
-    std::vector<TypeField> parameters;
-    std::string return_type;
-    Half_Expr func_body;
-
-    Def_Func() = default;
-    Def_Func(std::string n, std::vector<TypeField>& p, std::string r, Half_Expr b);
-    Def_Func(const Def_Func& o);
-    Def_Func& operator=(const Def_Func& o);
-};
 
 struct Half_FuncDecl
 {

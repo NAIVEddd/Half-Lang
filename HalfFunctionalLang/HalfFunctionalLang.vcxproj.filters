@@ -39,9 +39,6 @@
     <ClCompile Include="Parser\CharParsers.cpp">
       <Filter>Parser</Filter>
     </ClCompile>
-    <ClCompile Include="Syntax\Base.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="IR\IR.cpp">
       <Filter>IR</Filter>
     </ClCompile>
@@ -69,10 +66,13 @@
     <ClCompile Include="Parser\Parser.cpp">
       <Filter>Parser</Filter>
     </ClCompile>
-    <ClCompile Include="Syntax\TypeCheck.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Syntax\ExprParser.cpp">
+      <Filter>Syntax</Filter>
+    </ClCompile>
+    <ClCompile Include="Syntax\TypeCheck.cpp">
+      <Filter>Syntax</Filter>
+    </ClCompile>
+    <ClCompile Include="Syntax\Base.cpp">
       <Filter>Syntax</Filter>
     </ClCompile>
   </ItemGroup>
