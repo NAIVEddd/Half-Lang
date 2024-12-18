@@ -19,20 +19,33 @@ struct Builder
 {
     std::vector<Half_Ir_BasicBlock> blocks;
     size_t insert_point;
+    size_t block_alloc_entry;
 
-    Builder() : insert_point(0)
+    Builder(std::string name = "") : insert_point(0), block_alloc_entry(-1)
     {
-        NewBlock();
+        NewBlock(std::move(name));
     }
 
     void SetInsertPoint(size_t i)
     {
         insert_point = i;
     }
-
-    size_t NewBlock()
+    void SetAllocEntry(size_t i)
     {
-        blocks.push_back(Half_Ir_BasicBlock());
+        block_alloc_entry = i;
+    }
+
+    size_t NewBlock(std::string name = "")
+    {
+        if (name.empty())
+        {
+            blocks.push_back(Half_Ir_BasicBlock());
+        }
+        else
+        {
+            auto label_name = Temp::NewBlockLabel().l + "_" + name;
+            blocks.push_back(Half_Ir_BasicBlock(Temp::Label(label_name)));
+        }
         return blocks.size() - 1;
     }
     Half_Ir_BasicBlock& GetBlock(size_t i)

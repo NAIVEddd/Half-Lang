@@ -1,33 +1,14 @@
 #include "Semant.h"
 #include "Symbol.h"
 #include "Builder.h"
+#include <algorithm>
 
 
-auto IR_Make_Char =
+/*auto IR_Make_Char =
 [](char c) -> Half_IR
     {
         // TODO
         return Half_Ir_Const(c);
-    };
-
-auto IR_Make_Const =
-[](int i) -> Half_IR
-    {
-        return Half_Ir_Const(i);
-    };
-
-auto IR_Make_Float =
-[](float f) -> Half_IR
-    {
-        // TODO
-        return Half_Ir_Const(f);
-    };
-
-auto IR_Make_String =
-[](std::string s) -> Half_IR
-    {
-        // TODO
-        return Half_Ir_Const(s.size());
     };
 
 auto IR_Make_Value =
@@ -36,7 +17,7 @@ auto IR_Make_Value =
         static auto overload = overloaded{ IR_Make_Char, IR_Make_Const, IR_Make_Float, IR_Make_String };
         _ASSERT(value);
         return std::visit(overload, value->value);
-    };
+    };*/
 
 
 
@@ -223,11 +204,6 @@ Half_Ir_Exp Trans_Expr(std::shared_ptr<Table>& table, Half_Expr& expr)
         auto& assign = **passign;
         return Trans_Assign(table, assign);
     }
-    else if (auto pdeffunc = std::get_if<std::shared_ptr<Def_Func>>(&expr.expr))
-    {
-        auto& deffunc = **pdeffunc;
-        return Trans_Deffunc(table, deffunc);
-    }
     else if (auto plet = std::get_if<std::shared_ptr<Half_Let>>(&expr.expr))
     {
         auto& let = **plet;
@@ -278,7 +254,7 @@ Half_Ir_Exp Trans_Expr(std::shared_ptr<Table>& table, Half_Expr& expr)
             funcscope->insert(smb);
             funcscope->labels.insert({ smb.name, Temp::NewLabel(funcscope->labels.size()) });
         }
-        auto block_entry = Default_builder.NewBlock();
+        auto block_entry = Default_builder.NewBlock("entry");
         Default_builder.SetInsertPoint(block_entry);
         Half_Ir_Label func_label(Temp::Label(func.name));
         Half_Ir_Exp func_label_exp(func_label);
@@ -362,6 +338,63 @@ Half_Ir_Name Trans_Expr(Half_Expr& expr, Builder& builder)
     return exp_result;
 }
 
+Half_Ir_Name Trans_CondOp(std::shared_ptr<Table>& table, Builder& builder, Half_Op::Half_OpExpr& op, Temp::Label true_label, Temp::Label false_label)
+{
+    if (auto pvar = std::get_if<Half_Var>(&op))
+    {
+        auto& var = *pvar;
+        auto tmp = Half_Expr(var);
+        return Trans_Expr(table, builder, tmp);
+    }
+    else if (auto pvalue = std::get_if<Half_Value>(&op))
+    {
+        auto& value = *pvalue;
+        auto tmp = Half_Expr(value);
+        return Trans_Expr(table, builder, tmp);
+    }
+    else if (auto pfuncall = std::get_if<Half_Funcall>(&op))
+    {
+        auto& funcall = *pfuncall;
+        auto tmp = Half_Expr(funcall);
+        return Trans_Expr(table, builder, tmp);
+    }
+    else if (auto pop = std::get_if<Half_Op>(&op))
+    {
+        auto& binop = *pop;
+        auto l = Trans_CondOp(table, builder, *binop.left, true_label, false_label);
+        auto r = Trans_CondOp(table, builder, *binop.right, true_label, false_label);
+        auto cmp = Half_Ir_Compare(binop.op, l, r, Temp::NewLabel());
+        auto br = Half_Ir_LlvmBranch(cmp, true_label, false_label);
+        builder.AddExp(br);
+        return cmp.out_label;
+    }
+
+    // Todo: support other type
+    _ASSERT(false);
+    return Half_Ir_Name();
+}
+
+Half_Ir_Name Trans_If_Cond(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& cond, Temp::Label true_label, Temp::Label false_label)
+{
+    // support only one condition like (a < b)
+    //  TODO:
+    //  support multiple conditions like (a < b && c > d)
+    if (auto pop = std::get_if<std::shared_ptr<Half_Op>>(&cond.expr))
+    {
+        auto& op = **pop;
+        Half_Op::Half_OpExpr temp_op = op;
+        return Trans_CondOp(table, builder, temp_op, true_label, false_label);
+        /*auto l = Trans_CondOp(table, builder, *op.left, true_label, false_label);
+        auto r = Trans_CondOp(table, builder, *op.right, true_label, false_label);
+        auto cmp = Half_Ir_Compare(op.op, l, r, Temp::NewLabel());
+        auto br = Half_Ir_LlvmBranch(cmp, true_label, false_label);
+        builder.AddExp(br);
+        return cmp.out_label;*/
+    }
+    printf("only support binary op exp type in if.cond\n");
+    _ASSERT(false);
+    return Half_Ir_Name();
+}
 
 Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& expr)
 {
@@ -376,22 +409,12 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
 
         table->insert(s);
 
+        _ASSERT(builder.block_alloc_entry != -1);
         auto alloc = Half_Ir_Alloc(s.offset, Temp::NewLabel());
-        builder.AddExp(alloc);
+        builder.AddExp(builder.block_alloc_entry, alloc);
 
         auto assign = Half_Expr(let.def);
         return Trans_Expr(table, builder, assign);
-        /*auto assign = let.def;
-        auto rval = Trans_Expr(table, builder, assign.right);
-        auto symbol = table->find(assign.left.name());
-        if (!symbol)
-        {
-            _ASSERT(false);
-            return Half_Ir_Name("Varabile not defined:(" + assign.left.name() + ")");
-        }
-        auto store = Half_Ir_Store(symbol.value().offset, rval.name);
-        builder.AddExp(store);
-        return rval.name;*/
     }
     else if (auto pvar = std::get_if<std::shared_ptr<Half_Var>>(&expr.expr))
     {
@@ -401,7 +424,15 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
     else if (auto pvalue = std::get_if<std::shared_ptr<Half_Value>>(&expr.expr))
     {
         auto& value = **pvalue;
+        if (auto pint = std::get_if<int>(&value.value))
+        {
+            auto const_ir = Half_Ir_Const(*pint);
+            builder.AddExp(const_ir);
+            return Half_Ir_Name(const_ir.out_label);
+        }
 
+        // TODO: support other value type
+        _ASSERT(false);
     }
     else if (auto pop = std::get_if<std::shared_ptr<Half_Op>>(&expr.expr))
     {
@@ -435,11 +466,10 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         func_ir.args = func.parameters;
 
         // 1. Create a new block for the function
-        auto block_entry = builder.NewBlock();
+        auto alloc_entry = builder.NewBlock("stack_alloc");
+        auto block_entry = builder.NewBlock("entry");
+        builder.SetAllocEntry(alloc_entry);
         builder.SetInsertPoint(block_entry);
-        //Half_Ir_Label func_label(Temp::Label(func.name));
-        //Half_Ir_Exp func_label_exp(func_label);
-        //builder.AddExp(block_entry, func_label_exp);
 
         // 2. Create a new scope for the function
         auto funcscope = Table::begin_scope(table);
@@ -451,7 +481,7 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
             funcscope->insert(smb);
             funcscope->labels.insert({ smb.name, Temp::NewLabel(funcscope->labels.size()) });
             auto alloc = Half_Ir_Alloc(smb.offset, Temp::NewLabel());
-            builder.AddExp(alloc);
+            builder.AddExp(alloc_entry, alloc);
         }
         
         // 4. Translate the function body
@@ -460,20 +490,134 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         builder.AddExp(ret);
 
         // 5. Move all blocks in builder to function ir
+        func_ir.alloc = builder.blocks[alloc_entry];
         for (size_t i = block_entry; i < builder.blocks.size(); i++)
         {
             func_ir.blocks.push_back(builder.blocks[i]);
         }
         // 6. Remove the blocks from the builder
         builder.blocks.erase(builder.blocks.begin() + block_entry, builder.blocks.end());
+        builder.blocks.erase(builder.blocks.begin() + builder.block_alloc_entry);
         builder.insert_point = builder.blocks.size() - 1;
+        builder.block_alloc_entry = -1;
         builder.AddExp(func_ir);
         return Half_Ir_Name("FuncDecl, should't use this label " + func.name);
     }
-    //else if (auto pif = std::get_if<std::shared_ptr<Half_If>>(&expr.expr))
-    //{
-    //    auto& _if = **pif;
-    //}
+    else if (auto pif = std::get_if<std::shared_ptr<Half_If>>(&expr.expr))
+    {
+        auto& _if = **pif;
+
+        // use temp builder to translate condition and body
+        //   insert these blocks to the main builder in the end
+        //   to make sure the blocks are in the right order
+        Builder body_builder;
+        Builder cond_builder("cond");
+
+        auto block_entry = body_builder.insert_point + 1;
+        auto block_if_true = body_builder.NewBlock("if_true");
+        auto block_if_false = body_builder.NewBlock("if_false");
+        auto block_if_end = body_builder.NewBlock("if_merge");
+        auto if_result_phi = Half_Ir_Phi(Temp::NewLabel());
+
+        auto true_used_var = std::map<Half_Var, Half_Ir_Name>();
+        auto false_used_var = std::map<Half_Var, Half_Ir_Name>();
+        auto common_used_var = std::vector<std::pair<Half_Ir_Name, Half_Ir_Label>>();
+
+        /// translate condition
+        Trans_If_Cond(table, cond_builder, _if.condition,
+            body_builder.blocks[block_if_true].label, body_builder.blocks[block_if_false].label);
+
+        /// translate body
+        auto insert_var = [](std::map<Half_Var, Half_Ir_Name>& used_var, const Table& tab, const Half_Expr& e, Half_Ir_Name& label)
+            {
+                if (auto passign = std::get_if<std::shared_ptr<Half_Assign>>(&e.expr))
+                {
+                    auto& assign = **passign;
+                    if (tab.find(assign.left.name(), false))
+                    {
+                        used_var.insert({ assign.left, label });
+                    }
+                }
+            };
+        if (auto pvec = std::get_if<std::shared_ptr<std::vector<Half_Expr>>>(&_if.trueExpr.expr))
+        {
+            // set insert point to the true block
+            body_builder.SetInsertPoint(block_if_true);
+
+            auto& vec = **pvec;
+            auto true_table = Table::begin_scope(table);
+            Half_Ir_Name result;
+            for (size_t i = 0; i < vec.size(); i++)
+            {
+                result = Trans_Expr(true_table, body_builder, vec[i]);
+                insert_var(true_used_var, true_table, vec[i], result);
+            }
+            auto jmp = Half_Ir_Jump(body_builder.blocks[block_if_end].label);
+            body_builder.AddExp(jmp);
+
+            auto block_label = body_builder.blocks[block_if_true].label;
+            if_result_phi.Insert(result, block_label);
+        }
+        else
+        {
+            _ASSERT(false);
+        }
+        if (auto pvec = std::get_if<std::shared_ptr<std::vector<Half_Expr>>>(&_if.falseExpr.expr))
+        {
+            // set insert point to the false block
+            body_builder.SetInsertPoint(block_if_false);
+
+            auto& vec = **pvec;
+            auto false_table = Table::begin_scope(table);
+            Half_Ir_Name result;
+            for (size_t i = 0; i < vec.size(); i++)
+            {
+                result = Trans_Expr(false_table, body_builder, vec[i]);
+                insert_var(false_used_var, false_table, vec[i], result);
+            }
+            auto jmp = Half_Ir_Jump(body_builder.blocks[block_if_end].label);
+            body_builder.AddExp(jmp);
+
+            auto block_label = body_builder.blocks[block_if_false].label;
+            if_result_phi.Insert(result, block_label);
+        }
+        else
+        {
+            _ASSERT(false);
+        }
+
+        // set insert point to the end block
+        body_builder.SetInsertPoint(block_if_end);
+
+        // find out common used var in true and false block
+        auto find_begin = true_used_var.begin();
+        auto find_end = true_used_var.end();
+        for (auto& v : false_used_var)
+        {
+            auto t_iter = true_used_var.find(v.first);
+            if (t_iter != true_used_var.end())
+            {
+                // print debug info
+                printf("Common used var: %s\n", v.first.name().c_str());
+                // convert common used var to phi
+                auto phi = Half_Ir_Phi(Temp::NewLabel());
+                phi.Insert(t_iter->second, body_builder.blocks[block_if_true].label);
+                phi.Insert(v.second, body_builder.blocks[block_if_false].label);
+                body_builder.AddExp(phi);
+            }
+        }
+
+        body_builder.AddExp(if_result_phi);
+
+        // move all blocks in cond_builder and body_builder to the main builder
+        //  insert condition_blocks begin from the end, to make sure the blocks are in the right order
+        builder.blocks.insert(builder.blocks.end(), cond_builder.blocks.rbegin(), cond_builder.blocks.rend());
+        builder.blocks.insert(builder.blocks.end(), body_builder.blocks.begin() + block_entry, body_builder.blocks.end());
+
+        builder.SetInsertPoint(builder.blocks.size() - 1);
+
+        return Half_Ir_Name(if_result_phi.result);
+    }
     //else if (auto pwhile = std::get_if<std::shared_ptr<Half_While>>(&expr.expr))
     //{
     //    auto& _while = **pwhile;
@@ -490,12 +634,6 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
             Trans_Expr(table, builder, *begin);
         }
         return Trans_Expr(table, builder, vec.back());
-        /*Half_Ir_Name name;
-        for (auto& v : vec)
-        {
-            name = Trans_Expr(table, builder, v);
-        }
-        return name;*/
     }
     else if (auto ptype = std::get_if<std::shared_ptr<Half_TypeDecl>>(&expr.expr))
     {

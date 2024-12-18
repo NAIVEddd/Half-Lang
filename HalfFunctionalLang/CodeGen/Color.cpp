@@ -28,6 +28,16 @@ void Color::initialize(Liveness& liveness)
             }
         }
     }
+
+    // Ensure all temps are considered, even if they have no edges
+    for (size_t i = 0; i < adjList.size(); ++i)
+    {
+        if (adjList[i].empty())
+        {
+            printf("    add self edge %s : %zd\n", tempMap.get(i).l.c_str(), i);
+            stack.push(i);
+        }
+    }
 }
 
 void Color::simplify()
@@ -60,8 +70,10 @@ void Color::select()
                 usedColors.insert(color[neighbor]);
             }
         }
-        for (int c = 0; c < adjList.size(); ++c)
+        for (int c = 0; c < numRegisters; ++c)
         {
+            // select a color
+            //    if current register not used by neighbors, assign it
             if (usedColors.find(c) == usedColors.end())
             {
                 color[node] = c;

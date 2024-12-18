@@ -142,6 +142,17 @@ public:
 
 	void ShrinkOP(std::vector<A>& terms, std::vector<std::string>& opStrings, int start)
 	{
+        // error report:
+		//		if opStrings is not find, print error message and interrupt the program
+        for (auto& op : opStrings)
+        {
+            if (ops.find(op) == ops.end())
+            {
+                printf("Operator %s not found\n", op.c_str());
+                exit(1);
+            }
+        }
+
 		if (opStrings.size() == 1)
 		{
 			terms[0] = ops[opStrings[0]].converter(terms[0], terms[1]);

@@ -93,7 +93,7 @@ _ParserInput::_ParserInput(line_iterator begin, line_iterator end)
     lines_raw->reserve(end.line - begin.line);
     line_indents.reserve(end.line - begin.line);
     //lines->reserve(end.line - begin.line);
-    for (int i = begin.line; i < end.line; i++)
+    for (size_t i = begin.line; i < end.line; i++)
     {
         lines_raw->push_back(o_lines_raw[i]);
         std::string_view line_view(lines_raw->back());
@@ -122,13 +122,13 @@ _ParserInput& _ParserInput::operator=(const _ParserInput& other)
     return *this;
 }
 
-char _ParserInput::operator[](int i) const
+char _ParserInput::operator[](size_t i) const
 {
     _ASSERT(i >= 0);
     i += current_pos.column;
 
     auto& lines_raw = *this->lines_raw;
-    int line_index = current_pos.line;
+    size_t line_index = current_pos.line;
     while ((line_index < lines_raw.size()) && (i >= lines_raw[line_index].size()))
     {
         i -= lines_raw[line_index].size();
@@ -141,8 +141,6 @@ char _ParserInput::operator[](int i) const
     _ASSERT(i < lines_raw[line_index].size());
 
     return lines_raw[line_index][i];
-    //auto& line = (*lines)[line_index];
-    //return i < line.indent? ' ' : line.line_text[i];
 }
 
 char _ParserInput::operator[](ParserPos p) const
@@ -158,11 +156,6 @@ bool _ParserInput::empty() const
 {
     return current_pos.line >= (*lines_raw).size();
 }
-
-//size_t _ParserInput::size() const
-//{
-//
-//}
 
 _ParserInput::iterator& _ParserInput::iterator::operator++()
 {
@@ -186,7 +179,7 @@ _ParserInput::iterator _ParserInput::iterator::operator++(int)
     return temp;
 }
 
-_ParserInput::iterator& _ParserInput::iterator::operator+(int i)
+_ParserInput::iterator& _ParserInput::iterator::operator+(size_t i)
 {
     while (i > 0)
     {
@@ -237,7 +230,7 @@ _ParserInput::line_iterator _ParserInput::line_iterator::operator++(int)
     return temp;
 }
 
-_ParserInput::line_iterator& _ParserInput::line_iterator::operator+(int i)
+_ParserInput::line_iterator& _ParserInput::line_iterator::operator+(size_t i)
 {
     line += i;
     return *this;

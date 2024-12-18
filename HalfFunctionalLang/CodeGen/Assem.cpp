@@ -155,6 +155,21 @@ void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<
     printf("None\n");
 }
 
+void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs)
+{
+    for (size_t i = 0; i < builder.blocks.size(); i++)
+    {
+        auto& block = builder.blocks[i];
+        std::stack<Temp::Label> temps;
+        //MunchExp_llvmlike(Half_Ir_Label(block.label), instrs, temps);
+        for (auto& exp : block.exps)
+        {
+            printf("\n");
+            MunchExp_llvmlike(exp, instrs, temps);
+        }
+    }
+}
+
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
 {
     std::stack<Temp::Label> temps;
@@ -180,8 +195,8 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, st
 {
     if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&exp.exp))
     {
-        auto t = Temp::Label(std::to_string((*pconst)->n));
-        //temps.push(t);
+        auto t = (*pconst)->out_label;
+        instrs.push_back(AS_Move(t, Temp::Label("%" + std::to_string((*pconst)->n))));
         return;
     }
     else if (auto plabel = std::get_if<std::shared_ptr<Half_Ir_Label>>(&exp.exp))
@@ -196,16 +211,73 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, st
         printf("    ");
         instrs.push_back(AS_Label((*pfunc)->name));
 
-        auto block = (*pfunc)->blocks[0];
-        std::vector<Half_Ir_Alloc> allocs;
-        std::vector<Half_Ir_Exp> others;
-        SeperateExp(block.exps, allocs, others);
-        instrs.push_back(AS_StackAlloc((allocs.size() + 1) * 4));
+        // 1. allocs stack space (according to the number of parameters)
+        instrs.push_back(AS_StackAlloc(((*pfunc)->alloc.exps.size() + 1) * 4));
 
-        for (auto& b : others)
+        // 2. map func blocks with label and index
+        std::map<Temp::Label, size_t> block_map;
+        for (size_t i = 0; i < (*pfunc)->blocks.size(); i++)
         {
-            printf("    ");
-            MunchExp_llvmlike(b, instrs, temps);
+            auto& b = (*pfunc)->blocks[i];
+            block_map.insert({ b.label, i });
+        }
+
+        // 3. pre process the phi node
+        for (size_t i = 0; i < (*pfunc)->blocks.size(); i++)
+        {
+            auto& block = (*pfunc)->blocks[i];
+            for (auto& exp : block.exps)
+            {
+                if (auto pphi = std::get_if<std::shared_ptr<Half_Ir_Phi>>(&exp.exp))
+                {
+                    auto& phi = **pphi;
+                    for (auto& [n, l] : phi.values)
+                    {
+                        if (auto p = block_map.find(l.lab); p != block_map.end())
+                        {
+                            auto& target_block = (*pfunc)->blocks[p->second];
+                            auto last = target_block.exps.back();
+                            target_block.exps.back() = Half_Ir_Exp(Half_Ir_Move(phi.result, n));
+                            target_block.exps.push_back(last);
+                        }
+                        else
+                        {
+                            printf("Phi node error, not found block label:%s\n", l.lab.l.c_str());
+                            _ASSERT(false);
+                        }
+                    }
+                }
+            }
+            // remove phi node
+            block.exps.erase(std::remove_if(block.exps.begin(), block.exps.end(), [](Half_Ir_Exp& e)
+                {
+                    if (auto pphi = std::get_if<std::shared_ptr<Half_Ir_Phi>>(&e.exp))
+                    {
+                        return true;
+                    }
+                    return false;
+                }), block.exps.end());
+        }
+
+        // 4. generate code for each block
+        for (auto& block : (*pfunc)->blocks)
+        {
+            // insert block label
+            instrs.push_back(AS_Label(block.label));
+
+            for (auto& e : block.exps)
+            {
+                printf("    ");
+                if (auto pphi = std::get_if<std::shared_ptr<Half_Ir_Phi>>(&e.exp))
+                {
+                    // shouldn't be here
+                    _ASSERT(false);
+                }
+                else
+                {
+                    MunchExp_llvmlike(e, instrs, temps);
+                }
+            }
         }
         return;
     }
@@ -285,6 +357,54 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, st
         instrs.push_back(AS_Return());
         return;
     }
+    else if (auto pmove = std::get_if<std::shared_ptr<Half_Ir_Move>>(&exp.exp))
+    {
+        printf("Half_Ir_Move\n");
+        auto& move = **pmove;
+        Temp::Label dst, src;
+        if (auto pname = std::get_if<std::shared_ptr<Half_Ir_Name>>(&move.left.exp))
+        {
+            dst = (*pname)->name;
+        }
+        else
+        {
+            printf("Not support other exp type in Half_Ir_Move.left\n");
+            _ASSERT(false);
+        }
+        if (auto pname = std::get_if<std::shared_ptr<Half_Ir_Name>>(&move.right.exp))
+        {
+            src = (*pname)->name;
+        }
+        else
+        {
+            printf("Not support other exp type in Half_Ir_Move.right\n");
+            _ASSERT(false);
+        }
+        instrs.push_back(AS_Move(dst, src));
+        return;
+    }
+    else if (auto pbr = std::get_if<std::shared_ptr<Half_Ir_LlvmBranch>>(&exp.exp))
+    {
+        printf("Half_Ir_Branch\n");
+        auto& branch = **pbr;
+
+        instrs.push_back(AS_Oper("cmp", branch.condition.left.name, branch.condition.right.name));
+        instrs.push_back(AS_Jump(branch.condition.op, branch.true_label));
+        instrs.push_back(AS_Jump(Half_Ir_Compare::GetNot(branch.condition.op), branch.false_label));
+        return;
+    }
+    else if (auto pjmp = std::get_if<std::shared_ptr<Half_Ir_Jump>>(&exp.exp))
+    {
+        printf("Half_Ir_Jump\n");
+        auto& jmp = **pjmp;
+        instrs.push_back(AS_Jump("jmp", jmp.target));
+        return;
+    }
+    else
+    {
+        printf("None\n");
+        _ASSERT(false);
+    }
 }
 
 inline std::string to_string(const AS_StackAlloc& al)
@@ -293,15 +413,19 @@ inline std::string to_string(const AS_StackAlloc& al)
 }
 inline std::string to_string(const AS_Oper& op)
 {
-    return op.assem + "l " + op.src.l + ", " + op.dst.l + "\n";
+    auto src = op.src.l.starts_with('e') ? "%" + op.src.l : op.src.l;
+    auto dst = op.dst.l.starts_with('e') ? "%" + op.dst.l : op.dst.l;
+    return op.assem + "l " + src + ", " + dst + "\n";
 }
 inline std::string to_string(const AS_Move& mv)
 {
-    return std::string("movl ") + mv.src.l + ", " + mv.dst.l + "\n";
+    auto src = mv.src.l.starts_with('e') ? "%" + mv.src.l : mv.src.l;
+    auto dst = mv.dst.l.starts_with('e') ? "%" + mv.dst.l : mv.dst.l;
+    return std::string("movl ") + src + ", " + dst + "\n";
 }
 inline std::string to_string(const AS_Jump& jmp)
 {
-    return std::string("jmp ") + jmp.target.l + "\n";
+    return jmp.jump + " " + jmp.target.l + "\n";
 }
 inline std::string to_string(const AS_Label& lab)
 {

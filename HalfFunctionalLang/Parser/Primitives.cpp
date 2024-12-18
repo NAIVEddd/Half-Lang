@@ -64,7 +64,7 @@ bool IsAsciiUpper(char c)
 
 bool IsPunctuation(char c)
 {
-    static std::string punc = "+-*/";
+    static std::string punc = "+-*/!=&|%^<>";
     return punc.find(c) != -1;
 }
 

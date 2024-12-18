@@ -1,10 +1,23 @@
 #include "Liveness.h"
 
-void Liveness::inittemps()
+void Liveness::inittemps(const Graph& g)
 {
+    // insert all nodes use and def into temps
     std::set<Temp::Label> tempset;
+    for (auto& node : g.Nodes)
+    {
+        for (auto& l : node.Use())
+        {
+            tempset.insert(l);
+        }
+        for (auto& l : node.Def())
+        {
+            tempset.insert(l);
+        }
+    }
+
     temps.clear();
-    for (auto& i : in)
+    /*for (auto& i : in)
     {
         for (auto& l : i)
         {
@@ -17,7 +30,7 @@ void Liveness::inittemps()
         {
             tempset.insert(l);
         }
-    }
+    }*/
     temps.assign_range(tempset);
 }
 
@@ -78,7 +91,7 @@ void Liveness::initialize(const Graph& g)
     } while (have_value_change);
     in = inlabels;
     out = outlabels;
-    inittemps();
+    inittemps(g);
     printf("\n->Liveness::initialize cost %d loops\n", count);
 }
 
@@ -139,7 +152,7 @@ void Liveness::rinitialize(const Graph& g)
     } while (have_value_change);
     in = inlabels;
     out = outlabels;
-    inittemps();
+    inittemps(g);
     printf("\n->Liveness::rinitialize cost %d loops\n", count);
 }
 

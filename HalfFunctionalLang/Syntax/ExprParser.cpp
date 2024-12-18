@@ -237,6 +237,14 @@ ParserResult<Half_Funcall> pfuncall(ParserInput s)
 	return std::make_pair(funcall, expr.value().second);
 }
 
+Converter2<Half_Op::Half_OpExpr, Half_Op::Half_OpExpr, Half_Op::Half_OpExpr> GetOpConverter(const std::string& op)
+{
+    return [=](Half_Op::Half_OpExpr l, Half_Op::Half_OpExpr r)
+        {
+            return Half_Op::Half_OpExpr(Half_Op(op, std::move(l), std::move(r)));
+        };
+}
+
 Parser<Half_Op> GetOpParser()
 {
 	using A = Half_Op::Half_OpExpr;
@@ -254,26 +262,46 @@ Parser<Half_Op> GetOpParser()
 	auto choice = Choice(std::vector{ parsefuncall, parsevalue, parsevar });
 	auto popexpr = Between(space, space, choice);
 	static auto parser = OperatorParser(popexpr);
-	Converter2<A, A, A> c_plus =
-		[](A l, A r)
-		{return A(Half_Op("+", std::move(l), std::move(r))); };
-	Converter2<A, A, A> c_minus =
-		[](A l, A r)
-		{return A(Half_Op("-", std::move(l), std::move(r))); };
-	Converter2<A, A, A> c_multy =
-		[](A l, A r)
-		{return A(Half_Op("*", std::move(l), std::move(r))); };
-	Converter2<A, A, A> c_devide =
-		[](A l, A r)
-		{return A(Half_Op("/", std::move(l), std::move(r))); };
-	auto op_plus = InfixOperator("+", 1, c_plus);
-	auto op_minus = InfixOperator("-", 1, c_minus);
-	auto op_multy = InfixOperator("*", 2, c_multy);
-	auto op_devide = InfixOperator("/", 2, c_devide);
+
+    //auto op_and = InfixOperator("and", 1, GetOpConverter("and"));
+    auto op_and = InfixOperator("&&", 1, GetOpConverter("&&"));
+    //auto op_or = InfixOperator("or", 1, GetOpConverter("or"));
+    auto op_or = InfixOperator("||", 1, GetOpConverter("||"));
+    auto op_bit_and = InfixOperator("&", 2, GetOpConverter("&"));
+    auto op_bit_or = InfixOperator("|", 2, GetOpConverter("|"));
+    auto op_bit_xor = InfixOperator("^", 2, GetOpConverter("^"));
+    auto op_eq = InfixOperator("==", 3, GetOpConverter("=="));
+    auto op_not_eq = InfixOperator("!=", 3, GetOpConverter("!="));
+    auto op_less = InfixOperator("<", 4, GetOpConverter("<"));
+    auto op_less_eq = InfixOperator("<=", 4, GetOpConverter("<="));
+    auto op_greater = InfixOperator(">", 4, GetOpConverter(">"));
+    auto op_greater_eq = InfixOperator(">=", 4, GetOpConverter(">="));
+    auto op_shift_l = InfixOperator("<<", 5, GetOpConverter("<<"));
+    auto op_shift_r = InfixOperator(">>", 5, GetOpConverter(">>"));
+	auto op_plus = InfixOperator("+", 6, GetOpConverter("+"));
+	auto op_minus = InfixOperator("-", 6, GetOpConverter("-"));
+	auto op_multy = InfixOperator("*", 7, GetOpConverter("*"));
+	auto op_devide = InfixOperator("/", 7, GetOpConverter("/"));
+    auto op_mod = InfixOperator("%", 7, GetOpConverter("%"));
+
+    parser.AddOperator(op_and);
+    parser.AddOperator(op_or);
+    parser.AddOperator(op_bit_and);
+    parser.AddOperator(op_bit_or);
+    parser.AddOperator(op_bit_xor);
+    parser.AddOperator(op_eq);
+    parser.AddOperator(op_not_eq);
+    parser.AddOperator(op_less);
+    parser.AddOperator(op_less_eq);
+    parser.AddOperator(op_greater);
+    parser.AddOperator(op_greater_eq);
+    parser.AddOperator(op_shift_l);
+    parser.AddOperator(op_shift_r);
 	parser.AddOperator(op_plus);
 	parser.AddOperator(op_minus);
 	parser.AddOperator(op_multy);
 	parser.AddOperator(op_devide);
+    parser.AddOperator(op_mod);
 
 	Converter<A, Half_Op> conv =
 		[](A a)
@@ -352,7 +380,7 @@ Parser<Half_If> GetIfParser()
 			auto res = parse(s);
 			if (!res)
 			{
-				printf("Parse if failed! at line:%d col:%d\n",
+				printf("Parse if failed! at line:%zd col:%zd\n",
 					s.current_pos.line, s.current_pos.column);
 				return std::nullopt;
 			}
@@ -433,7 +461,7 @@ Parser<Half_FuncDecl> GetFuncDeclParser()
 			auto rname = pfuncname(s);
 			if (!rname)
 			{
-				printf("Parse function name failed! at line:%d col:%d\n",
+				printf("Parse function name failed! at line:%zd col:%zd\n",
 					s.current_pos.line, s.current_pos.column);
 				return std::nullopt;
 			}
@@ -441,7 +469,7 @@ Parser<Half_FuncDecl> GetFuncDeclParser()
 			auto rpairs = oneof_pairs(s);
 			if (!rpairs)
 			{
-				printf("Parse function parameters failed! at line:%d col:%d\n",
+				printf("Parse function parameters failed! at line:%zd col:%zd\n",
 					s.current_pos.line, s.current_pos.column);
 				return std::nullopt;
 			}
@@ -455,7 +483,7 @@ Parser<Half_FuncDecl> GetFuncDeclParser()
 			auto rbody = pbody(s);
 			if (!rbody)
 			{
-				printf("Parse function body failed! at line:%d col:%d\n",
+				printf("Parse function body failed! at line:%zd col:%zd\n",
 					s.current_pos.line, s.current_pos.column);
 				return std::nullopt;
 			}
@@ -545,7 +573,7 @@ Parser<Half_Let> GetLetParser()
 			auto res = parse(s);
 			if (!res)
 			{
-				printf("Parse let failed! at line:%d col:%d\n",
+				printf("Parse let failed! at line:%zd col:%zd\n",
 					s.current_pos.line, s.current_pos.column);
 				return std::nullopt;
 			}
@@ -648,7 +676,7 @@ Parser<Half_While> GetWhileParser()
 			auto condition = pcondition(s);
 			if (!condition)
 			{
-				printf("Parse while condition failed! at line:%d col:%d\n",
+				printf("Parse while condition failed! at line:%zd col:%zd\n",
 					s.current_pos.line, s.current_pos.column);
 				return std::nullopt;
 			}
@@ -657,7 +685,7 @@ Parser<Half_While> GetWhileParser()
 			auto body = pbody(s);
 			if (!body)
 			{
-				printf("Parse while body failed! at line:%d col:%d\n",
+				printf("Parse while body failed! at line:%zd col:%zd\n",
 					s.current_pos.line, s.current_pos.column);
 				return std::nullopt;
 			}

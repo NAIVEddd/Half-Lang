@@ -395,14 +395,35 @@ void test_operator_parser()
         Parser<int> pint = Pipe(num, cstoint);
         auto opParser = OperatorParser(pint);
         Converter2<int, int, int> plus = [](int l, int r) {return l + r; };
-        auto op_plus = InfixOperator<int>("+", 1, plus);
-        auto op_minus = InfixOperator<int>("-", 1, [](int l, int r) {return l - r; });
-        auto op_multy = InfixOperator<int>("*", 2, [](int l, int r) {return l * r; });
-        auto op_devide = InfixOperator<int>("/", 2, [](int l, int r) {return l / r; });
+        auto op_plus = InfixOperator<int>("+", 6, plus);
+        auto op_minus = InfixOperator<int>("-", 6, [](int l, int r) {return l - r; });
+        auto op_multy = InfixOperator<int>("*", 7, [](int l, int r) {return l * r; });
+        auto op_devide = InfixOperator<int>("/", 7, [](int l, int r) {return l / r; });
+        auto op_and = InfixOperator<int>("&&", 1, [](int l, int r) {return l && r; });
+        auto op_or = InfixOperator<int>("||", 1, [](int l, int r) {return l || r; });
+        auto op_eq = InfixOperator<int>("==", 3, [](int l, int r) {return l == r; });
+        auto op_not_eq = InfixOperator<int>("!=", 3, [](int l, int r) {return l != r; });
+        auto op_less = InfixOperator<int>("<", 4, [](int l, int r) {return l < r; });
+        auto op_less_eq = InfixOperator<int>("<=", 4, [](int l, int r) {return l <= r; });
+        auto op_greater = InfixOperator<int>(">", 4, [](int l, int r) {return l > r; });
+        auto op_greater_eq = InfixOperator<int>(">=", 4, [](int l, int r) {return l >= r; });
+        auto op_shift_l = InfixOperator<int>("<<", 5, [](int l, int r) {return l << r; });
+        auto op_shift_r = InfixOperator<int>(">>", 5, [](int l, int r) {return l >> r; });
+
         opParser.AddOperator(op_plus);
         opParser.AddOperator(op_minus);
         opParser.AddOperator(op_multy);
         opParser.AddOperator(op_devide);
+        opParser.AddOperator(op_and);
+        opParser.AddOperator(op_or);
+        opParser.AddOperator(op_eq);
+        opParser.AddOperator(op_not_eq);
+        opParser.AddOperator(op_less);
+        opParser.AddOperator(op_less_eq);
+        opParser.AddOperator(op_greater);
+        opParser.AddOperator(op_greater_eq);
+        opParser.AddOperator(op_shift_l);
+        opParser.AddOperator(op_shift_r);
         auto result = opParser.GetParser()(prog);
         _ASSERT(result);
         _ASSERT(result.value().first == 4);
@@ -437,6 +458,27 @@ void test_operator_parser()
         result = opParser.GetParser()(prog7);
         _ASSERT(result);
         _ASSERT(result.value().first == 2);
+
+        // test logic oper precedence
+        std::string prog8 = "1 + 2 * 3 - 2 * 2";
+        result = opParser.GetParser()(prog8);
+        _ASSERT(result);
+        _ASSERT(result.value().first == 3);
+
+        std::string prog9 = "1 + 2 == 3 + 0";
+        result = opParser.GetParser()(prog9);
+        _ASSERT(result);
+        _ASSERT(result.value().first == 1);
+
+        std::string prog10 = "3 == 3 * 1 && 1 + 2 == 3 + 0";
+        result = opParser.GetParser()(prog10);
+        _ASSERT(result);
+        _ASSERT(result.value().first == 1);
+
+        std::string prog11 = "6 + 0 == 3 << 1";
+        result = opParser.GetParser()(prog11);
+        _ASSERT(result);
+        _ASSERT(result.value().first == 1);
     }
 }
 
@@ -747,6 +789,16 @@ R"(function square(n int) : int =
     let x = n * n
     x
 end)";
+    std::string prog1_if =
+R"(function square_biger_20(n int) : int =
+    n + n
+    let x = n * n
+    if x > 20 then
+        x
+    else
+        0
+    end
+end)";
     std::string prog2 =
         prog1 +
         R"(
@@ -819,6 +871,7 @@ end)";
         std::string assign = "let x = 10";
         std::string assign2 = "let x = 10\n x = 0";
         std::string assign3 = "let x = 10\n x = 1 + 2\n x = 1";
+        std::string if_1 = assign + "\n if x > 0 then 1 else -1 end";
         {
             auto check = TypeCheck();
             if (check.Check(pexpr(assign).value().first))
@@ -850,9 +903,17 @@ end)";
                 printf("TypeCheck success\n");
             }
         }
+        {
+            auto check = TypeCheck();
+            auto e = pprogram(if_1);
+            if (!check.Check(e.value().first))
+            {
+                printf("TypeCheck Failed!!!  ---------\n");
+            }
+        }
     }
     {
-        {
+        /* { // test prog1
             Builder b;
             auto check = TypeCheck();
             auto e = pprogram(prog1);
@@ -863,10 +924,16 @@ end)";
             auto ir = Trans_Expr(e.value().first);
             auto exp = ir.exp;
             std::vector<AS_Instr> instrs;
-            /*MunchExp(ir, instrs);
+            
+            auto ir_name = Trans_Expr(e.value().first, b);
+            printf("\n%s\n", to_string(ir_name.name).c_str());
+            auto exps = b.GetBlock(0).exps[0];
+            MunchExp_llvmlike(exps, instrs);
             printf("\nCount %zd\n", instrs.size());
-
-            // generate graph
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                printf("%s", to_string(instrs[i]).c_str());
+            }
             auto g = Graph();
             g.initialize(instrs);
             auto live = Liveness();
@@ -884,12 +951,27 @@ end)";
             for (size_t i = 0; i < g.instrs.size(); i++)
             {
                 printf("%s", to_string(g.instrs[i]).c_str());
-            }*/
+            }
+        }*/
+        {   // test prog1_if
+            Builder b;
+            auto check = TypeCheck();
+            auto e = pprogram(prog1_if);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+            /*auto ir = Trans_Expr(e.value().first);
+            auto exp = ir.exp;*/
+            std::vector<AS_Instr> instrs;
 
             auto ir_name = Trans_Expr(e.value().first, b);
             printf("\n%s\n", to_string(ir_name.name).c_str());
-            auto exps = b.GetBlock(0).exps[0];
-            MunchExp_llvmlike(exps, instrs);
+
+            MunchExps_llvmlike(b, instrs);
+
+            /*auto exps = b.GetBlock(0).exps[0];
+            MunchExp_llvmlike(exps, instrs);*/
             printf("\nCount %zd\n", instrs.size());
             for (size_t i = 0; i < instrs.size(); i++)
             {

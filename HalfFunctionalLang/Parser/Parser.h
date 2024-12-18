@@ -8,9 +8,9 @@
 
 struct ParserPos
 {
-    int line;
-    int column;
-    ParserPos(int l, int c) : line(l), column(c) {}
+    size_t line;
+    size_t column;
+    ParserPos(size_t l, size_t c) : line(l), column(c) {}
     bool operator==(const ParserPos& other) const
     {
         return line == other.line && column == other.column;
@@ -30,7 +30,7 @@ struct ParserPos
 };
 struct ParserLine
 {
-    int indent;
+    size_t indent;
     ParserPos position;
     const std::string_view line_text;
 };
@@ -48,7 +48,7 @@ struct _ParserInput
         }
         iterator& operator++();
         iterator operator++(int);
-        iterator& operator+(int i);
+        iterator& operator+(size_t i);
         iterator& operator=(const iterator& other);
 
         bool operator==(const iterator& other) const;
@@ -57,12 +57,12 @@ struct _ParserInput
     struct line_iterator
     {
         const _ParserInput& data;
-        int line;
-        line_iterator(const _ParserInput& d, int l) : data(d), line(l) {}
+        size_t line;
+        line_iterator(const _ParserInput& d, size_t l) : data(d), line(l) {}
         ParserLine operator*() const;
         line_iterator& operator++();
         line_iterator operator++(int);
-        line_iterator& operator+(int i);
+        line_iterator& operator+(size_t i);
         line_iterator& operator=(const line_iterator& other);
 
         bool operator==(const line_iterator& other) const;
@@ -72,8 +72,7 @@ struct _ParserInput
     using const_line_iterator = const line_iterator;
 
     std::shared_ptr<std::vector<std::string>> lines_raw;
-    std::vector<int> line_indents;
-    //std::shared_ptr<std::vector<ParserLine>> lines;
+    std::vector<size_t> line_indents;
     ParserPos current_pos;
 
     _ParserInput(std::string s);
@@ -116,7 +115,7 @@ struct _ParserInput
         return line_iterator(*this, lines_raw->size());
     }
     // operator std::string() const;
-    char operator[](int i) const;
+    char operator[](size_t i) const;
     char operator[](ParserPos p) const;
     bool empty() const;
     //size_t size() const;

@@ -128,7 +128,7 @@ Parser<char> OneDigit()
 
 Parser<char> OneDigitOrChar()
 {
-	return OneOf(IsDigitOrChar);
+	return OneOf(IsDigitOrChar) | OneChar('_');
 }
 
 Parser<char> OneHex()

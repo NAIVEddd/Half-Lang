@@ -42,6 +42,12 @@ struct Temp
         auto str = std::string("t_") + std::to_string(c);
         return Label(str);
     }
+    static Label NewBlockLabel()
+    {
+        static int count = 0;
+        auto str = std::string("Block_") + std::to_string(count++);
+        return Label(str);
+    }
     static Temp NewLabel(std::string s)
     {
         return Temp(Label(s));

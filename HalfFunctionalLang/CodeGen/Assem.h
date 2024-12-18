@@ -31,6 +31,8 @@ struct AS_Move
         : dst(d), src(s) {}
     AS_Move(const AS_Move& o)
         : dst(o.dst), src(o.src) {}
+    AS_Move(const Half_Ir_Name& d, const Half_Ir_Name& s)
+        : dst(d.name), src(s.name) {}
 };
 
 struct AS_Label
@@ -42,10 +44,34 @@ struct AS_Label
 
 struct AS_Jump
 {
+    using Oper = Half_Ir_Compare::Oper;
     std::string jump;
     Temp::Label target;
-    AS_Jump(std::string&& j, Temp::Label&& t) : jump(j), target(t) {}
+    AS_Jump(std::string j, Temp::Label t) : jump(std::move(j)), target(std::move(t)) {}
+    AS_Jump(Oper op, Temp::Label t)
+        : jump(GetOperString(op)), target(std::move(t)) {}
     AS_Jump(const AS_Jump& o) : jump(o.jump), target(o.target) {}
+    static std::string GetOperString(Oper op)
+    {
+        switch (op)
+        {
+        case Half_Ir_BinOp::Oper::Less:
+            return "jl";
+        case Half_Ir_BinOp::Oper::LessEqual:
+            return "jle";
+        case Half_Ir_BinOp::Oper::Greater:
+            return "jg";
+        case Half_Ir_BinOp::Oper::GreaterEqual:
+            return "jge";
+        case Half_Ir_BinOp::Oper::Equal:
+            return "je";
+        case Half_Ir_BinOp::Oper::NotEqual:
+            return "jne";
+        default:
+            break;
+        }
+        return "unknown";
+    }
 };
 
 struct AS_Return
@@ -66,6 +92,7 @@ struct AS_Function
 
 void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
 void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<Temp::Label>& temps);
+void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs);
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<Temp::Label>& temps);
 std::string to_string(const AS_Instr& instr);

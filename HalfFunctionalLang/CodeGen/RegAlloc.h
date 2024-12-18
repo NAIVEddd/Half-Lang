@@ -3,7 +3,7 @@
 #include "Liveness.h"
 #include "Graph.h"
 
-const std::vector<std::string> RegNames{ "ebx", "ecx", "edx", "esi", "edi" };
+const std::vector<std::string> RegNames{ "eax", "ebx", "ecx", "edx", "esi", "edi" };
 
 struct RegAlloc
 {

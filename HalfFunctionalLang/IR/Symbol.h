@@ -106,29 +106,37 @@ struct Table
     {
         funcs.insert({ f.name, f });
     }
-    std::optional<Symbol> find(std::string n)
+    std::optional<Symbol> find(std::string n, bool rec = true) const
     {
         auto search = values.find(n);
         if (search == values.end())
         {
-            if (!parent)
+            if (rec)
             {
-                return std::nullopt;
+                if (!parent)
+                {
+                    return std::nullopt;
+                }
+                return parent->find(n);
             }
-            return parent->find(n);
+            return std::nullopt;
         }
         return search->second;
     }
-    std::optional<FunctionSymbol> findFunc(std::string n)
+    std::optional<FunctionSymbol> findFunc(std::string n, bool rec = true)
     {
         auto search = funcs.find(n);
         if (search == funcs.end())
         {
-            if (!parent)
+            if (rec)
             {
-                return std::nullopt;
+                if (!parent)
+                {
+                    return std::nullopt;
+                }
+                return parent->findFunc(n);
             }
-            return parent->findFunc(n);
+            return std::nullopt;
         }
         return search->second;
     }

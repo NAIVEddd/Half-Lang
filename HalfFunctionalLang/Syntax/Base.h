@@ -20,7 +20,6 @@ const std::set<std::string> Keyword =
 struct Half_Expr;
 struct Half_Var;
 struct Half_Value;
-struct Half_Function;
 struct Half_Funcall;
 struct Half_Op;
 struct Half_Assign;
@@ -54,11 +53,10 @@ struct Half_Expr
     using Expr = std::variant<
         std::shared_ptr<Half_Var>,    // rename to VarDecl
         std::shared_ptr<Half_Value>,    // rename to ValueLiteral
-        //std::shared_ptr<Half_Function>,// deprecated, use FunctionDecl instead
         std::shared_ptr<Half_Funcall>,
         std::shared_ptr<Half_Op>,
         std::shared_ptr<Half_Assign>,// deprecated, use VarDecl instead
-        std::shared_ptr<Def_Func>,  // deprecated, use FunctionDecl instead
+        //std::shared_ptr<Def_Func>,  // deprecated, use FunctionDecl instead
         std::shared_ptr<Half_Let>,  // deprecated, use VarDecl|FunctionDecl instead
         std::shared_ptr<Half_If>,
         std::shared_ptr<Half_For>,
@@ -92,6 +90,13 @@ struct Half_Var
         SimpleVar(std::string s) :id(s) {}
         SimpleVar(const SimpleVar& v) = default;
         SimpleVar& operator=(const SimpleVar& v) = default;
+        bool operator<(const SimpleVar& other) const {
+            return id < other.id;
+        }
+
+        bool operator==(const SimpleVar& other) const {
+            return id == other.id;
+        }
     };
     struct FieldVar
     {
@@ -101,6 +106,13 @@ struct Half_Var
         FieldVar(const FieldVar& v) noexcept;
         FieldVar& operator=(const FieldVar& v) noexcept;
         ~FieldVar() = default;
+        bool operator<(const FieldVar& other) const {
+            return std::tie(var, id) < std::tie(other.var, other.id);
+        }
+
+        bool operator==(const FieldVar& other) const {
+            return std::tie(var, id) == std::tie(other.var, other.id);
+        }
     };
     struct SubscriptVar
     {
@@ -110,6 +122,13 @@ struct Half_Var
         SubscriptVar(const SubscriptVar& v);
         SubscriptVar& operator=(const SubscriptVar& v) noexcept;
         ~SubscriptVar() = default;
+        bool operator<(const SubscriptVar& other) const {
+            return std::tie(var, index) < std::tie(other.var, other.index);
+        }
+
+        bool operator==(const SubscriptVar& other) const {
+            return std::tie(var, index) == std::tie(other.var, other.index);
+        }
     };
 
     Half_Var() = default;
@@ -119,6 +138,13 @@ struct Half_Var
     Half_Var(const Half_Var& v);
     Half_Var& operator=(const Half_Var& v);
     std::string name() const;
+    bool operator<(const Half_Var& other) const {
+        return var < other.var;
+    }
+
+    bool operator==(const Half_Var& other) const {
+        return var == other.var;
+    }
 
     std::variant<std::monostate, SimpleVar, FieldVar, SubscriptVar> var;
 };

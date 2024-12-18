@@ -1,6 +1,7 @@
 #pragma once
 
 #include"IR.h"
+#include"Temp.h"
 #include<string>
 #include<vector>
 
@@ -30,7 +31,13 @@ struct Half_Ir_BasicBlock
             return it != i.it;
         }
     };
+    Temp::Label label;
     std::vector<Half_Ir_Exp> exps;
+    Half_Ir_BasicBlock(Temp::Label l = Temp::NewBlockLabel()) : label(l) {}
+    void Rename(Temp::Label l)
+    {
+        label = l;
+    }
 
     //std::optional<Half_Ir_Exp> GetTerminator()
     //{

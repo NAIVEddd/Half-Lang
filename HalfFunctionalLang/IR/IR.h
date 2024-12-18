@@ -13,8 +13,10 @@ struct Half_Ir_Name;
 struct Half_Ir_Call;
 struct Half_Ir_BinOp;
 struct Half_Ir_LlvmBinOp;
+struct Half_Ir_Compare;
 struct Half_Ir_Memory;
 struct Half_Ir_Branch;
+struct Half_Ir_LlvmBranch;  // branch llvm like
 struct Half_Ir_Func;
 struct Half_Ir_Move;
 struct Half_Ir_Label;
@@ -26,6 +28,7 @@ struct Half_Ir_Alloc;
 struct Half_Ir_Return;
 struct Half_Ir_Value;
 struct Half_Ir_Function;
+struct Half_Ir_Phi;
 
 struct Half_Ir_Exp
 {
@@ -42,11 +45,14 @@ struct Half_Ir_Exp
         std::shared_ptr<Half_Ir_Call>,
         std::shared_ptr<Half_Ir_BinOp>,
         std::shared_ptr<Half_Ir_LlvmBinOp>,
+        //std::shared_ptr<Half_Ir_Compare>,
         std::shared_ptr<Half_Ir_Memory>,
         std::shared_ptr<Half_Ir_Branch>,
+        std::shared_ptr<Half_Ir_LlvmBranch>,
         std::shared_ptr<Half_Ir_Func>,
         std::shared_ptr<Half_Ir_Move>,
         std::shared_ptr<Half_Ir_Label>,
+        std::shared_ptr<Half_Ir_Phi>,
         std::shared_ptr<Half_Ir_Jump>,
         std::shared_ptr<Half_Ir_Seq>
     >;
@@ -61,8 +67,9 @@ struct Half_Ir_Exp
 struct Half_Ir_Const
 {
     int n;
-    Half_Ir_Const() = default;
-    Half_Ir_Const(int x) : n(x) {}
+    Temp::Label out_label;
+    Half_Ir_Const(int x, Temp::Label l = Temp::NewLabel()) : n(x), out_label(l) {}
+    Half_Ir_Const(const Half_Ir_Const& c) : n(c.n), out_label(c.out_label) {}
 };
 
 struct Half_Ir_Alloc
@@ -106,6 +113,7 @@ struct Half_Ir_Function
     Half_TypeDecl::FuncType type;
     std::vector<Half_FuncDecl::TypeField> args;
 
+    Half_Ir_BasicBlock alloc;
     std::vector<Half_Ir_BasicBlock> blocks;
     Half_Ir_Function() = default;
     Half_Ir_Function(std::string n, Half_TypeDecl::FuncType t, std::vector<Half_FuncDecl::TypeField>& a)
@@ -152,6 +160,9 @@ struct Half_Ir_BinOp
     enum class Oper
     {
         Unknow, Plus, Minus, Multy, Divide,
+        Mod, And, Or, Xor, LShift, RShift,
+        Less, LessEqual, Greater, GreaterEqual,
+        Equal, NotEqual
     };
     Oper op;
     Half_Ir_Exp left;
@@ -167,7 +178,19 @@ struct Half_Ir_BinOp
             {"+", Oper::Plus},
             {"-", Oper::Minus},
             {"*", Oper::Multy},
-            {"/", Oper::Divide}
+            {"/", Oper::Divide},
+            {"%", Oper::Mod},
+            {"&&", Oper::And},
+            {"||", Oper::Or},
+            {"^", Oper::Xor},
+            {"<<", Oper::LShift},
+            {">>", Oper::RShift},
+            {"<", Oper::Less},
+            {"<=", Oper::LessEqual},
+            {">", Oper::Greater},
+            {">=", Oper::GreaterEqual},
+            {"==", Oper::Equal},
+            {"!=", Oper::NotEqual}
         };
         auto i = map.find(s);
         if (i == map.end())
@@ -194,6 +217,46 @@ struct Half_Ir_LlvmBinOp
     static Oper GetOper(std::string s)
     {
         return Half_Ir_BinOp::GetOper(s);
+    }
+};
+
+struct Half_Ir_Compare
+{
+    using Oper = Half_Ir_BinOp::Oper;
+    Oper op;
+    Half_Ir_Name left;
+    Half_Ir_Name right;
+    Temp::Label out_label;
+    Half_Ir_Compare(Oper o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+        : op(o), left(l), right(r), out_label(out) {}
+    Half_Ir_Compare(std::string o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+        : op(GetOper(o)), left(l), right(r), out_label(out) {}
+    Half_Ir_Compare(const Half_Ir_Compare& c)
+        : op(c.op), left(c.left), right(c.right), out_label(c.out_label) {}
+    static Oper GetOper(std::string s)
+    {
+        return Half_Ir_BinOp::GetOper(s);
+    }
+    static Oper GetNot(Oper op)
+    {
+        switch (op)
+        {
+        case Oper::Less:
+            return Oper::GreaterEqual;
+        case Oper::LessEqual:
+            return Oper::Greater;
+        case Oper::Greater:
+            return Oper::LessEqual;
+        case Oper::GreaterEqual:
+            return Oper::Less;
+        case Oper::Equal:
+            return Oper::NotEqual;
+        case Oper::NotEqual:
+            return Oper::Equal;
+        default:
+            break;
+        }
+        return Oper::Unknow;
     }
 };
 
@@ -225,6 +288,30 @@ struct Half_Ir_Label
     Temp::Label lab;
     Half_Ir_Label(Temp::Label l):lab(l){}
     Half_Ir_Label(const Half_Ir_Label& l) : lab(l.lab) {}
+};
+
+struct Half_Ir_LlvmBranch
+{
+    Half_Ir_Compare condition;
+    Temp::Label true_label;
+    Temp::Label false_label;
+    Half_Ir_LlvmBranch(Half_Ir_Compare cond, Temp::Label tl, Temp::Label fl)
+        : condition(cond), true_label(tl), false_label(fl)
+    {
+    }
+};
+
+struct Half_Ir_Phi
+{
+    Half_Ir_Name result;
+    std::vector<std::pair<Half_Ir_Name, Half_Ir_Label>> values;
+    Half_Ir_Phi(Half_Ir_Name r) : result(r) {}
+    Half_Ir_Phi(const Half_Ir_Phi& p) : result(p.result), values(p.values) {}
+    // insert
+    void Insert(Half_Ir_Name n, Half_Ir_Label l)
+    {
+        values.push_back({ n, l });
+    }
 };
 
 struct Half_Ir_Func
