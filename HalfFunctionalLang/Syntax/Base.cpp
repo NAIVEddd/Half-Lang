@@ -301,3 +301,25 @@ bool Half_TypeDecl::BasicType::is_basic_t(const Half_Value& v)
     }
     return false;
 }
+
+Half_Op::Half_OpExpr ConvertToOpExpr(Half_Expr& v)
+{
+    if (auto pvar = std::get_if<std::shared_ptr<Half_Var>>(&v.expr))
+    {
+        return Half_Op::Half_OpExpr(**pvar);
+    }
+    else if (auto pvalue = std::get_if<std::shared_ptr<Half_Value>>(&v.expr))
+    {
+        return Half_Op::Half_OpExpr(**pvalue);
+    }
+    else if (auto pfuncall = std::get_if<std::shared_ptr<Half_Funcall>>(&v.expr))
+    {
+        return Half_Op::Half_OpExpr(**pfuncall);
+    }
+    else if (auto pop = std::get_if<std::shared_ptr<Half_Op>>(&v.expr))
+    {
+        return Half_Op::Half_OpExpr(**pop);
+    }
+    _ASSERT(false);
+    return Half_Op::Half_OpExpr();
+}

@@ -173,7 +173,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&exp.exp))
     {
         auto t = (*pconst)->out_label;
-        instrs.push_back(AS_Move(t, Temp::Label("%" + std::to_string((*pconst)->n))));
+        instrs.push_back(AS_Move(t, Temp::Label("$" + std::to_string((*pconst)->n))));
         return;
     }
     else if (auto plabel = std::get_if<std::shared_ptr<Half_Ir_Label>>(&exp.exp))
@@ -189,7 +189,8 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         instrs.push_back(AS_Label((*pfunc)->name));
 
         // 1. allocs stack space (according to the number of parameters)
-        instrs.push_back(AS_StackAlloc(((*pfunc)->alloc.exps.size() + 1) * 4));
+        auto stack_size = ((*pfunc)->alloc.exps.size() + 1) * 4;
+        instrs.push_back(AS_StackAlloc(stack_size));
 
         // 2. map func blocks with label and index
         std::map<Temp::Label, size_t> block_map;
@@ -256,6 +257,10 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
                 }
             }
         }
+
+        // 5. return
+        _ASSERT(std::get_if<AS_Return>(&instrs.back()));
+        instrs.back() = AS_Return(stack_size);
         return;
     }
     else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_Load>>(&exp.exp))
@@ -379,7 +384,8 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
 
 inline std::string to_string(const AS_StackAlloc& al)
 {
-    return std::string("subq %" + std::to_string(al.bytes) + ", %rsp\n");
+    auto push = std::string("pushq %rbp\n");
+    return push + std::string("subq $" + std::to_string(al.bytes) + ", %rsp\n");
 }
 inline std::string to_string(const AS_Oper& op)
 {
@@ -403,7 +409,11 @@ inline std::string to_string(const AS_Label& lab)
 }
 inline std::string to_string(const AS_Return& ret)
 {
-    return "ret\n";
+    if (ret.bytes > 0)
+    {
+        return std::string("addq $" + std::to_string(ret.bytes) + ", %rsp\n") + "popq %rbp\nret\n";
+    }
+    return "popq %rbp\nret\n";
 }
 
 std::string to_string(const AS_Instr& instr)

@@ -76,7 +76,10 @@ struct AS_Jump
 
 struct AS_Return
 {
-    char c;
+    size_t bytes;
+    AS_Return() : bytes(0) {}
+    AS_Return(size_t cc) : bytes(cc) {}
+    AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
 using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_Jump, AS_Label, AS_Return>;

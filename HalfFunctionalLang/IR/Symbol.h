@@ -76,32 +76,31 @@ struct FunctionSymbol
         : label(Temp::NewLabel("")) {}
 };
 
+struct Stack;
 struct Table
 {
     std::shared_ptr<Table> parent;
+    Stack* stack = nullptr;
     std::map<std::string, Symbol> values;
     std::map<std::string, FunctionSymbol> funcs;
     std::map<std::string, Temp::Label> labels;
 
     Table() = default;
-    Table(std::shared_ptr<Table>& p) : parent(p) {}
+    Table(std::shared_ptr<Table>& p) : parent(p), stack(p->stack) {}
+    ~Table();
 
     static std::shared_ptr<Table> begin_scope(std::shared_ptr<Table>& p)
     {
-        return std::make_shared<Table>(p);
+        auto ptr = std::make_shared<Table>(p);
+        ptr->stack = p->stack;
+        return ptr;
     }
     static std::shared_ptr<Table> end_scope(std::shared_ptr<Table>& t)
     {
         return t->parent;
     }
 
-    void insert(Symbol& s)
-    {
-        // value at offset 0 is stack frame pointer
-        // so we start at offset 4
-        s.offset = (values.size() + 1) * 4;
-        values.insert({ s.name, s });
-    }
+    void insert(Symbol& s);
     void insert(FunctionSymbol f)
     {
         funcs.insert({ f.name, f });
@@ -140,4 +139,45 @@ struct Table
         }
         return search->second;
     }
+};
+
+struct Stack
+{
+    Stack() : table(std::make_shared<Table>()) {}
+    Stack(std::shared_ptr<Table> t) : table(t) {}
+
+    size_t Alloc(size_t size)
+    {
+        size_t res = offset;
+        offset += size;
+        return res;
+    }
+    void Release(size_t size)
+    {
+        offset -= size;
+    }
+    std::shared_ptr<Table> NewScope()
+    {
+        auto t = table->begin_scope(table);
+        t->stack = this;
+        return t;
+    }
+    void insert(Symbol& s)
+    {
+        table->insert(s);
+    }
+    void insert(FunctionSymbol f)
+    {
+        table->insert(f);
+    }
+    std::optional<Symbol> find(std::string n) const
+    {
+        return table->find(n);
+    }
+    std::optional<FunctionSymbol> findFunc(std::string n)
+    {
+        return table->findFunc(n);
+    }
+    size_t offset = 0;
+    std::shared_ptr<Table> table;
 };

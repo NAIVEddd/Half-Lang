@@ -208,7 +208,10 @@ Half_Ir_Exp Trans_Expr(std::shared_ptr<Table>& table, Half_Expr& expr)
 
         func_ir.args = func.parameters;
 
-        auto funcscope = Table::begin_scope(table);
+        Stack stack;
+
+        auto funcscope = stack.NewScope();
+        //auto funcscope = Table::begin_scope(table);
         for (size_t i = 0; i < func.parameters.size(); i++)
         {
             Symbol smb;
@@ -445,6 +448,9 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
     else if (auto pfunc = std::get_if<std::shared_ptr<Half_FuncDecl>>(&expr.expr))
     {
         auto& func = **pfunc;
+
+        Stack stack;
+
         auto current_block_size = builder.blocks.size();
         Half_Ir_Function func_ir;
         func_ir.name = func.name;
@@ -457,7 +463,8 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         builder.SetInsertPoint(block_entry);
 
         // 2. Create a new scope for the function
-        auto funcscope = Table::begin_scope(table);
+        auto funcscope = stack.NewScope();
+        //auto funcscope = Table::begin_scope(table);
         // 3. Add the function parameters to the scope(allocation stack to store the parameters)
         for (size_t i = 0; i < func.parameters.size(); i++)
         {
@@ -652,10 +659,64 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         builder.SetInsertPoint(end_block);
         return Half_Ir_Name("While-expr-end-nil");
     }
-    //else if (auto pfor = std::get_if<std::shared_ptr<Half_For>>(&expr.expr))
-    //{
-    //    auto& _for = **pfor;
-    //}
+    else if (auto pfor = std::get_if<std::shared_ptr<Half_For>>(&expr.expr))
+    {
+        auto& _for = **pfor;
+        auto cond_label = builder.GenBlockLabel("for_cond");
+        auto body_label = builder.GenBlockLabel("for_body");
+        auto end_label = builder.GenBlockLabel("for_end");
+
+        // for table
+        auto for_table = Table::begin_scope(table);
+        auto for_init = Half_Let(Half_Assign(_for.var, _for.start));
+        auto init_expr = Half_Expr(for_init);
+        Trans_Expr(for_table, builder, init_expr);
+
+        // jump to condition block, if current block is not empty
+        if (builder.blocks[builder.insert_point].exps.size() > 0)
+        {
+            auto jmp_to_cond = Half_Ir_Jump(cond_label);
+            builder.AddExp(jmp_to_cond);
+        }
+
+        // condition block
+        auto cond_block = builder.NewBlock(cond_label);
+        builder.SetInsertPoint(cond_block);
+        auto cond = Half_Op(_for.isup? "<" : ">", Half_Op::Half_OpExpr(_for.var), ConvertToOpExpr(_for.end));
+        auto cond_expr = Half_Expr(cond);
+        Trans_If_Cond(for_table, builder, cond_expr, "for_cond",
+            body_label, end_label);
+
+        // body block
+        auto body_block = builder.NewBlock(body_label);
+        builder.SetInsertPoint(body_block);
+        if (auto pvec = std::get_if<std::shared_ptr<std::vector<Half_Expr>>>(&_for.body.expr))
+        {
+            auto& vec = **pvec;
+            for (size_t i = 0; i < vec.size(); i++)
+            {
+                Trans_Expr(for_table, builder, vec[i]);
+            }
+        }
+        else
+        {
+            _ASSERT(false);
+        }
+
+        // update condition variable
+        auto update = Half_Op(_for.isup ? "+" : "-", Half_Op::Half_OpExpr(_for.var), Half_Op::Half_OpExpr(Half_Value(1)));
+        auto update_assign = Half_Assign(_for.var, update);
+        auto update_expr = Half_Expr(update_assign);
+        Trans_Expr(for_table, builder, update_expr);
+
+        // jump to condition block, continue the loop
+        auto jmp_to_cond = Half_Ir_Jump(cond_label);
+        builder.AddExp(jmp_to_cond);
+
+        // end block
+        auto end_block = builder.NewBlock(end_label);
+        builder.SetInsertPoint(end_block);
+    }
     else if (auto pvec = std::get_if<std::shared_ptr<std::vector<Half_Expr>>>(&expr.expr))
     {
         auto& vec = **pvec;

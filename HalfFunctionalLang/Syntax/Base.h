@@ -185,6 +185,8 @@ struct Half_Op
     //Half_Op(Half_Op&& other);
 };
 
+Half_Op::Half_OpExpr ConvertToOpExpr(Half_Expr& v);
+
 struct Half_Assign
 {
     Half_Var left;
