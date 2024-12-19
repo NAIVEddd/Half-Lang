@@ -35,17 +35,24 @@ struct Builder
         block_alloc_entry = i;
     }
 
+    Temp::Label GenBlockLabel(std::string postfix = "")
+    {
+        if (postfix.empty())
+        {
+            return Temp::NewBlockLabel();
+        }
+        return Temp::Label(Temp::NewBlockLabel().l + "_" + postfix);
+    }
+
     size_t NewBlock(std::string name = "")
     {
-        if (name.empty())
-        {
-            blocks.push_back(Half_Ir_BasicBlock());
-        }
-        else
-        {
-            auto label_name = Temp::NewBlockLabel().l + "_" + name;
-            blocks.push_back(Half_Ir_BasicBlock(Temp::Label(label_name)));
-        }
+        auto label = GenBlockLabel(name);
+        blocks.push_back(Half_Ir_BasicBlock(label));
+        return blocks.size() - 1;
+    }
+    size_t NewBlock(Temp::Label label)
+    {
+        blocks.push_back(Half_Ir_BasicBlock(label));
         return blocks.size() - 1;
     }
     Half_Ir_BasicBlock& GetBlock(size_t i)

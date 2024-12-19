@@ -118,7 +118,7 @@ void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<
     else if (auto pmem = std::get_if<std::shared_ptr<Half_Ir_Memory>>(&exp.exp))
     {
         printf("Half_Ir_Memory\n");
-        auto l = Temp::Label(std::to_string((*pmem)->offset + 4) + std::string("(%esp)"));
+        auto l = Temp::Label(std::to_string((*pmem)->offset + 4) + std::string("(%rsp)"));
         temps.push(l);
         return;
     }
@@ -261,14 +261,14 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_Load>>(&exp.exp))
     {
         printf("Half_Ir_Load\n");
-        auto l = Temp::Label(std::to_string((*pload)->offset) + std::string("(%esp)"));
+        auto l = Temp::Label(std::to_string((*pload)->offset) + std::string("(%rsp)"));
         instrs.push_back(AS_Move((*pload)->out_label, l));
         return;
     }
     else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_Store>>(&exp.exp))
     {
         printf("Half_Ir_Store\n");
-        auto l = Temp::Label(std::to_string(std::get<size_t>((*pstore)->data)) + std::string("(%esp)"));
+        auto l = Temp::Label(std::to_string(std::get<size_t>((*pstore)->data)) + std::string("(%rsp)"));
         instrs.push_back(AS_Move(l, (*pstore)->in_label));
         return;
     }

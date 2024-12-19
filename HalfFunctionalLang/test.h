@@ -819,6 +819,23 @@ function square n =
     let x = n * n
     x
 end)";
+    std::string prog5 =
+        R"(
+function sum_0_to_i(i int) : int =
+    let c = 1
+    let sum = 0
+    while c < i && 1 < 2 do
+        let x =
+            if c > 5 then
+                1
+            else
+                0
+            end
+        sum = sum + c
+        c = c + 1
+    end
+    sum
+end)";
 
     /* {
         _ParserInput p1(prog1);
@@ -957,6 +974,45 @@ end)";
             Builder b;
             auto check = TypeCheck();
             auto e = pprogram(prog1_if);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+            std::vector<AS_Instr> instrs;
+
+            auto ir_name = Trans_Expr(e.value().first, b);
+            printf("\n%s\n", to_string(ir_name.name).c_str());
+
+            MunchExps_llvmlike(b, instrs);
+
+            printf("\nCount %zd\n", instrs.size());
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                printf("%s", to_string(instrs[i]).c_str());
+            }
+            auto g = Graph();
+            g.initialize(instrs);
+            auto live = Liveness();
+            live.initialize(g);
+            printf("\nCount %zd\n", g.Nodes.size());
+            auto rlive = Liveness();
+            rlive.rinitialize(g);
+            live == rlive;
+            Color color(8);
+            color.initialize(live);
+            color.allocate();
+            color.print();
+            RegAlloc regalloc;
+            regalloc.allocate(g, live);
+            for (size_t i = 0; i < g.instrs.size(); i++)
+            {
+                printf("%s", to_string(g.instrs[i]).c_str());
+            }
+        }
+        {   // test while code gen
+            Builder b;
+            auto check = TypeCheck();
+            auto e = pprogram(prog5);
             if (check.Check(e.value().first))
             {
                 printf("TypeCheck success\n");
