@@ -409,11 +409,12 @@ inline std::string to_string(const AS_Label& lab)
 }
 inline std::string to_string(const AS_Return& ret)
 {
-    if (ret.bytes > 0)
+    auto reset_rsp = std::string("movq %rbp, %rsp\n");
+    /*if (ret.bytes > 0)
     {
         return std::string("addq $" + std::to_string(ret.bytes) + ", %rsp\n") + "popq %rbp\nret\n";
-    }
-    return "popq %rbp\nret\n";
+    }*/
+    return reset_rsp + "popq %rbp\nret\n";
 }
 
 std::string to_string(const AS_Instr& instr)

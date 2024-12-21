@@ -671,6 +671,10 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         auto for_init = Half_Let(Half_Assign(_for.var, _for.start));
         auto init_expr = Half_Expr(for_init);
         Trans_Expr(for_table, builder, init_expr);
+        Half_Var termi_var(_for.var.name() + "_@for_termi");
+        auto for_termi = Half_Let(Half_Assign(termi_var, _for.end));
+        auto termi_expr = Half_Expr(for_termi);
+        Trans_Expr(for_table, builder, termi_expr);
 
         // jump to condition block, if current block is not empty
         if (builder.blocks[builder.insert_point].exps.size() > 0)
@@ -682,7 +686,7 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         // condition block
         auto cond_block = builder.NewBlock(cond_label);
         builder.SetInsertPoint(cond_block);
-        auto cond = Half_Op(_for.isup? "<" : ">", Half_Op::Half_OpExpr(_for.var), ConvertToOpExpr(_for.end));
+        auto cond = Half_Op(_for.isup? "<" : ">", Half_Op::Half_OpExpr(_for.var), Half_Op::Half_OpExpr(termi_var));
         auto cond_expr = Half_Expr(cond);
         Trans_If_Cond(for_table, builder, cond_expr, "for_cond",
             body_label, end_label);
