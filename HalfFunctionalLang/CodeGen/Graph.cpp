@@ -52,6 +52,9 @@ std::vector<Temp::Label> Node::Def() const
     {
 
     }
+    else if (auto pcall = std::get_if<AS_Call>(&info))
+    {
+    }
     else if (auto pret = std::get_if<AS_Return>(&info))
     {
 
@@ -79,6 +82,13 @@ std::vector<Temp::Label> Node::Use() const
     else if (auto plab = std::get_if<AS_Label>(&info))
     {
         
+    }
+    else if (auto pcall = std::get_if<AS_Call>(&info))
+    {
+        for (auto& arg : pcall->args)
+        {
+            labels.push_back(arg);
+        }
     }
     else if (auto pret = std::get_if<AS_Return>(&info))
     {

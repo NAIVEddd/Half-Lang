@@ -62,6 +62,13 @@ void Color::select()
     {
         int node = stack.top();
         stack.pop();
+
+        // already colored
+        if (color[node] != -1)
+        {
+            continue;
+        }
+
         std::set<int> usedColors;
         for (int neighbor : adjList[node])
         {

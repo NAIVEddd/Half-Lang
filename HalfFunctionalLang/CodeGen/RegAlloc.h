@@ -3,7 +3,7 @@
 #include "Liveness.h"
 #include "Graph.h"
 
-const std::vector<std::string> RegNames{ "eax", "ebx", "ecx", "edx", "esi", "edi" };
+const std::vector<std::string> RegNames{ "eax", "ebx", "ecx", "edx", "esi", "edi", "r8d", "r9d"};
 
 struct RegAlloc
 {
@@ -13,8 +13,34 @@ struct RegAlloc
     void allocate(Graph& g, Liveness& liveness)
     {
         color.initialize(liveness);
+        setDefaultColor(g);
         color.allocate();
         update(g);
+    }
+    void setDefaultColor(Graph& g)
+    {
+        for (auto& instr : g.instrs)
+        {
+            if (auto pcall = std::get_if<AS_Call>(&instr))
+            {
+                _ASSERT(pcall->args.size() <= 4);
+                auto regs = std::vector<std::string>{ "ecx", "edx", "r8d", "r9d" };
+                auto reg_idx = std::vector<size_t>(regs.size(), -1);
+                for (size_t i = 0; i < regs.size(); i++)
+                {
+                    // findout the index of the register
+                    reg_idx[i] = std::find(regNames.begin(), regNames.end(), regs[i]) - regNames.begin();
+                }
+                for (size_t i = 0; i < pcall->args.size(); ++i)
+                {
+                    if (i < regs.size())
+                    {
+                        color.color[color.tempMap.get(pcall->args[i])] = reg_idx[i];
+                        //pcall->args[i] = Temp::Label(regs[i]);
+                    }
+                }
+            }
+        }
     }
     void update(Graph& g)
     {
@@ -35,6 +61,14 @@ struct RegAlloc
                 auto dst = tempMap.find(pmv->dst) == -1 ? pmv->dst : Temp::Label(regNames[color.color[tempMap.get(pmv->dst)]]);
                 pmv->src = src;
                 pmv->dst = dst;
+            }
+            else if (auto pcall = std::get_if<AS_Call>(&instr))
+            {
+                for (size_t i = 0; i < pcall->args.size(); i++)
+                {
+                    auto arg = tempMap.find(pcall->args[i]) == -1 ? pcall->args[i] : Temp::Label(regNames[color.color[tempMap.get(pcall->args[i])]]);
+                    pcall->args[i] = arg;
+                }
             }
         }
         g.initialize(g.instrs);

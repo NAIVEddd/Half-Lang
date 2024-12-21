@@ -71,7 +71,8 @@ Half_Ir_Exp Trans_Funcall(std::shared_ptr<Table>& table, Half_Funcall& call)
     {
         arg_exp[i] = Trans_Expr(table, call.args[i]);
     }
-    return Half_Ir_Call(name, arg_exp);
+    //return Half_Ir_Call(call.name, arg_exp);
+    return Half_Ir_Const(-6);
 }
 
 Half_Ir_Exp Trans_Op(std::shared_ptr<Table>& table, Half_Op& op);
@@ -444,6 +445,16 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
     else if (auto pfuncall = std::get_if<std::shared_ptr<Half_Funcall>>(&expr.expr))
     {
         auto& funcall = **pfuncall;
+
+        std::vector<Half_Ir_Name> arg_exp(funcall.args.size());
+        for (size_t i = 0; i < funcall.args.size(); i++)
+        {
+            auto arg = Trans_Expr(table, builder, funcall.args[i]);
+            arg_exp[i] = arg.name;
+        }
+        Half_Ir_Call call(Temp::NewLabel(), Temp::Label(funcall.name), arg_exp);
+        builder.AddExp(call);
+        return call.out_label;
     }
     else if (auto pfunc = std::get_if<std::shared_ptr<Half_FuncDecl>>(&expr.expr))
     {

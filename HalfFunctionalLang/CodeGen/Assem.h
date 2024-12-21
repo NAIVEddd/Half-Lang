@@ -74,6 +74,16 @@ struct AS_Jump
     }
 };
 
+struct AS_Call
+{
+    Temp::Label fun_name;
+    std::vector<Temp::Label> args;
+    AS_Call(Temp::Label f, std::vector<Temp::Label>& a)
+        : fun_name(f), args(a) {}
+    AS_Call(const AS_Call& o)
+        : fun_name(o.fun_name), args(o.args) {}
+};
+
 struct AS_Return
 {
     size_t bytes;
@@ -82,7 +92,7 @@ struct AS_Return
     AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
-using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_Jump, AS_Label, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
 struct AS_Function
 {

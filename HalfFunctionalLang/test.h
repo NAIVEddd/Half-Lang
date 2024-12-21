@@ -821,16 +821,10 @@ function square n =
 end)";
     std::string prog5 =
         R"(
-function sum_0_to_i(i int) : int =
+function while_sum_0_to_i(i int) : int =
     let c = 1
     let sum = 0
-    while c < i && 1 < 2 do
-        let x =
-            if c > 5 then
-                1
-            else
-                0
-            end
+    while c <= i do
         sum = sum + c
         c = c + 1
     end
@@ -838,13 +832,27 @@ function sum_0_to_i(i int) : int =
 end)";
     std::string prog6 =
         R"(
-function sum_0_to_i(i int) : int =
+function for_sum_0_to_i(i int) : int =
     let sum = 0
-    i = i + 1
-    for c = 0 to i do
+    for c = 1 to i + 1 do
         sum = sum + c
     end
     sum
+end)";
+    std::string prog7 =
+        prog5 + prog6 +
+        R"(
+function main() : int =
+    let x = 10
+    let y = 0
+    let z = 0
+    y = while_sum_0_to_i(x)
+    z = for_sum_0_to_i(x)
+    if y == z then
+        1
+    else
+        0
+    end
 end)";
 
     /* {
@@ -876,7 +884,7 @@ end)";
             it++;
         }
     }*/
-    {
+    /* {
         ParserInput p1(prog2);
         printf("\n%s\n", prog2.c_str());
         auto e1 = pexpr(p1);
@@ -892,9 +900,9 @@ end)";
         _ASSERT(f3);
 
         
-    }
+    }*/
 
-    {
+    /* {
         std::string assign = "let x = 10";
         std::string assign2 = "let x = 10\n x = 0";
         std::string assign3 = "let x = 10\n x = 1 + 2\n x = 1";
@@ -938,7 +946,7 @@ end)";
                 printf("TypeCheck Failed!!!  ---------\n");
             }
         }
-    }
+    }*/
     {
         /* { // test prog1
             Builder b;
@@ -980,88 +988,128 @@ end)";
                 printf("%s", to_string(g.instrs[i]).c_str());
             }
         }*/
-        //{   // test prog1_if
-        //    Builder b;
-        //    auto check = TypeCheck();
-        //    auto e = pprogram(prog1_if);
-        //    if (check.Check(e.value().first))
-        //    {
-        //        printf("TypeCheck success\n");
-        //    }
-        //    std::vector<AS_Instr> instrs;
+        /*{   // test prog1_if
+            Builder b;
+            auto check = TypeCheck();
+            auto e = pprogram(prog1_if);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+            std::vector<AS_Instr> instrs;
 
-        //    auto ir_name = Trans_Expr(e.value().first, b);
-        //    printf("\n%s\n", to_string(ir_name.name).c_str());
+            auto ir_name = Trans_Expr(e.value().first, b);
+            printf("\n%s\n", to_string(ir_name.name).c_str());
 
-        //    MunchExps_llvmlike(b, instrs);
+            MunchExps_llvmlike(b, instrs);
 
-        //    printf("\nCount %zd\n", instrs.size());
-        //    for (size_t i = 0; i < instrs.size(); i++)
-        //    {
-        //        printf("%s", to_string(instrs[i]).c_str());
-        //    }
-        //    auto g = Graph();
-        //    g.initialize(instrs);
-        //    auto live = Liveness();
-        //    live.initialize(g);
-        //    printf("\nCount %zd\n", g.Nodes.size());
-        //    auto rlive = Liveness();
-        //    rlive.rinitialize(g);
-        //    live == rlive;
-        //    Color color(8);
-        //    color.initialize(live);
-        //    color.allocate();
-        //    color.print();
-        //    RegAlloc regalloc;
-        //    regalloc.allocate(g, live);
-        //    for (size_t i = 0; i < g.instrs.size(); i++)
-        //    {
-        //        printf("%s", to_string(g.instrs[i]).c_str());
-        //    }
-        //}
-        //{   // test while code gen
-        //    Builder b;
-        //    auto check = TypeCheck();
-        //    auto e = pprogram(prog5);
-        //    if (check.Check(e.value().first))
-        //    {
-        //        printf("TypeCheck success\n");
-        //    }
-        //    std::vector<AS_Instr> instrs;
+            printf("\nCount %zd\n", instrs.size());
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                printf("%s", to_string(instrs[i]).c_str());
+            }
+            auto g = Graph();
+            g.initialize(instrs);
+            auto live = Liveness();
+            live.initialize(g);
+            printf("\nCount %zd\n", g.Nodes.size());
+            auto rlive = Liveness();
+            rlive.rinitialize(g);
+            live == rlive;
+            Color color(8);
+            color.initialize(live);
+            color.allocate();
+            color.print();
+            RegAlloc regalloc;
+            regalloc.allocate(g, live);
+            for (size_t i = 0; i < g.instrs.size(); i++)
+            {
+                printf("%s", to_string(g.instrs[i]).c_str());
+            }
+        }*/
+        /*{   // test while code gen
+            Builder b;
+            auto check = TypeCheck();
+            auto e = pprogram(prog5);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+            std::vector<AS_Instr> instrs;
 
-        //    auto ir_name = Trans_Expr(e.value().first, b);
-        //    printf("\n%s\n", to_string(ir_name.name).c_str());
+            auto ir_name = Trans_Expr(e.value().first, b);
+            printf("\n%s\n", to_string(ir_name.name).c_str());
 
-        //    MunchExps_llvmlike(b, instrs);
+            MunchExps_llvmlike(b, instrs);
 
-        //    printf("\nCount %zd\n", instrs.size());
-        //    for (size_t i = 0; i < instrs.size(); i++)
-        //    {
-        //        printf("%s", to_string(instrs[i]).c_str());
-        //    }
-        //    auto g = Graph();
-        //    g.initialize(instrs);
-        //    auto live = Liveness();
-        //    live.initialize(g);
-        //    printf("\nCount %zd\n", g.Nodes.size());
-        //    auto rlive = Liveness();
-        //    rlive.rinitialize(g);
-        //    live == rlive;
-        //    Color color(8);
-        //    color.initialize(live);
-        //    color.allocate();
-        //    color.print();
-        //    RegAlloc regalloc;
-        //    regalloc.allocate(g, live);
-        //    for (size_t i = 0; i < g.instrs.size(); i++)
-        //    {
-        //        printf("%s", to_string(g.instrs[i]).c_str());
-        //    }
-        //}
-        {   // test for code gen
+            printf("\nCount %zd\n", instrs.size());
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                printf("%s", to_string(instrs[i]).c_str());
+            }
+            auto g = Graph();
+            g.initialize(instrs);
+            auto live = Liveness();
+            live.initialize(g);
+            printf("\nCount %zd\n", g.Nodes.size());
+            auto rlive = Liveness();
+            rlive.rinitialize(g);
+            live == rlive;
+            Color color(8);
+            color.initialize(live);
+            color.allocate();
+            color.print();
+            RegAlloc regalloc;
+            regalloc.allocate(g, live);
+            for (size_t i = 0; i < g.instrs.size(); i++)
+            {
+                printf("%s", to_string(g.instrs[i]).c_str());
+            }
+        }*/
+        /*{   // test for code gen
             Builder b;
             auto check = TypeCheck();
             auto e = pprogram(prog6);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+            std::vector<AS_Instr> instrs;
+
+            auto ir_name = Trans_Expr(e.value().first, b);
+            printf("\n%s\n", to_string(ir_name.name).c_str());
+
+            MunchExps_llvmlike(b, instrs);
+
+            printf("\nCount %zd\n", instrs.size());
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                printf("%s", to_string(instrs[i]).c_str());
+            }
+            auto g = Graph();
+            g.initialize(instrs);
+            auto live = Liveness();
+            live.initialize(g);
+            printf("\nCount %zd\n", g.Nodes.size());
+            auto rlive = Liveness();
+            rlive.rinitialize(g);
+            live == rlive;
+            Color color(8);
+            color.initialize(live);
+            color.allocate();
+            color.print();
+            RegAlloc regalloc;
+            regalloc.allocate(g, live);
+            for (size_t i = 0; i < g.instrs.size(); i++)
+            {
+                printf("%s", to_string(g.instrs[i]).c_str());
+            }
+        }*/
+
+        {   // test for code gen
+            Builder b;
+            auto check = TypeCheck();
+            auto e = pprogram(prog7);
             if (check.Check(e.value().first))
             {
                 printf("TypeCheck success\n");

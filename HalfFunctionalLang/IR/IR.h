@@ -259,10 +259,13 @@ struct Half_Ir_Compare
 
 struct Half_Ir_Call
 {
-    Half_Ir_Name fun_name;
-    std::vector<Half_Ir_Exp> args;
-    Half_Ir_Call(Half_Ir_Name n, std::vector<Half_Ir_Exp>& a)
-        : fun_name(n), args(a) {}
+    Temp::Label fun_name;
+    std::vector<Half_Ir_Name> args;
+    Temp::Label out_label;
+    Half_Ir_Call(Temp::Label call_label, Temp::Label n, std::vector<Half_Ir_Name>& a)
+        : fun_name(n), args(a), out_label(call_label) {}
+    Half_Ir_Call(const Half_Ir_Call& c)
+        : fun_name(c.fun_name), args(c.args), out_label(c.out_label) {}
 };
 
 struct Half_Ir_Memory

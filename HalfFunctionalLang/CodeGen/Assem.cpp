@@ -192,6 +192,13 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         auto stack_size = ((*pfunc)->alloc.exps.size() + 1) * 4;
         instrs.push_back(AS_StackAlloc(stack_size));
 
+        // 1.5 store parameters from registers to stack
+        auto regs = std::vector<std::string>{  "ecx","edx", "r8d", "r9d" };
+        for (size_t i = 0; i < (*pfunc)->args.size() && i < regs.size(); ++i)
+        {
+            instrs.push_back(AS_Move(Temp::Label(std::to_string(i * 4) + "(%rsp)"), Temp::Label(regs[i])));
+        }
+
         // 2. map func blocks with label and index
         std::map<Temp::Label, size_t> block_map;
         for (size_t i = 0; i < (*pfunc)->blocks.size(); i++)
@@ -313,12 +320,13 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     else if (auto pcall = std::get_if<std::shared_ptr<Half_Ir_Call>>(&exp.exp))
     {
         printf("Half_Ir_Call\n");
-        auto& vec = (*pcall)->args;
-        for (size_t i = 0; i < vec.size(); i++)
+        auto& call = **pcall;
+        std::vector<Temp::Label> args(call.args.size());
+        for (size_t i = 0; i < call.args.size(); i++)
         {
-            printf("        ");
-            MunchExp_llvmlike(vec[i], instrs);
+            args[i] = call.args[i].name;
         }
+        instrs.push_back(AS_Call(call.fun_name, args));
         return;
     }
     else if (auto pret = std::get_if<std::shared_ptr<Half_Ir_Return>>(&exp.exp))
@@ -407,14 +415,22 @@ inline std::string to_string(const AS_Label& lab)
 {
     return lab.label.l + ":\n";
 }
+inline std::string to_string(const AS_Call& call)
+{
+    std::string str;
+    /*for (size_t i = 0; i < call.args.size(); i++)
+    {
+        str += "pushq %" + call.args[i].l + "\n";
+    }*/
+    return str + "call " + call.fun_name.l + "\n";
+}
 inline std::string to_string(const AS_Return& ret)
 {
-    auto reset_rsp = std::string("movq %rbp, %rsp\n");
-    /*if (ret.bytes > 0)
+    if (ret.bytes > 0)
     {
-        return std::string("addq $" + std::to_string(ret.bytes) + ", %rsp\n") + "popq %rbp\nret\n";
-    }*/
-    return reset_rsp + "popq %rbp\nret\n";
+        return std::string("addq $" + std::to_string(ret.bytes) + ", %rsp\n") + "popq %rbp\nretq\n";
+    }
+    return "popq %rbp\nretq\n";
 }
 
 std::string to_string(const AS_Instr& instr)
@@ -438,6 +454,10 @@ std::string to_string(const AS_Instr& instr)
     else if (auto plab = std::get_if<AS_Label>(&instr))
     {
         return to_string(*plab);
+    }
+    else if (auto pcall = std::get_if<AS_Call>(&instr))
+    {
+        return to_string(*pcall);
     }
     else if (auto pret = std::get_if<AS_Return>(&instr))
     {
