@@ -150,6 +150,11 @@ struct Stack
     {
         size_t res = offset;
         offset += size;
+
+        if (offset > max_size)
+        {
+            max_size = offset;
+        }
         return res;
     }
     void Release(size_t size)
@@ -179,5 +184,6 @@ struct Stack
         return table->findFunc(n);
     }
     size_t offset = 0;
+    size_t max_size = 0;        // stack alloc need to know the max size
     std::shared_ptr<Table> table;
 };

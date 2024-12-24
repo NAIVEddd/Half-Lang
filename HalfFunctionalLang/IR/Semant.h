@@ -5,8 +5,6 @@
 #include"Builder.h"
 #include<memory>
 
-Half_Ir_Exp Trans_Expr(Half_Expr& expr);
-Half_Ir_Exp Trans_Expr(std::shared_ptr<Table>& table, Half_Expr& expr);
 Half_Ir_Name Trans_Expr(Half_Expr& expr, Builder& builder);
 Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& expr);
 

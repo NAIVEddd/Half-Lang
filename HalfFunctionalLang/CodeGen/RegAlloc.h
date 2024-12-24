@@ -35,7 +35,7 @@ struct RegAlloc
                 {
                     if (i < regs.size())
                     {
-                        color.color[color.tempMap.get(pcall->args[i])] = reg_idx[i];
+                        color.color[color.tempMap.get(pcall->args[i])] = (int)reg_idx[i];
                         //pcall->args[i] = Temp::Label(regs[i]);
                     }
                 }

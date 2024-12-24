@@ -1150,6 +1150,7 @@ end)";
 
 void test_ir()
 {
+    Builder builder;
     {
         std::string prog1 = "999";
         auto e1 = pexpr(prog1);
@@ -1157,9 +1158,7 @@ void test_ir()
 
         //auto v = std::get<std::shared_ptr<Half_Value>>(e1.value().first.expr);
         //auto ir = IR_Make_Value(v);
-        auto ir = Trans_Expr(e1.value().first);
-        auto ptr = std::get<std::shared_ptr<Half_Ir_Const>>(ir.exp);
-        _ASSERT(ptr);
+        auto ir_name = Trans_Expr(e1.value().first, builder);
     }
 
     {
@@ -1168,9 +1167,7 @@ void test_ir()
         _ASSERT(e1);
 
         //auto op = std::get<std::shared_ptr<Half_Value>>(e1.value().first.expr);
-        auto ir = Trans_Expr(e1.value().first);
-        auto index = ir.exp.index();
-        _ASSERT(index >= 0);
+        auto ir = Trans_Expr(e1.value().first, builder);
     }
 
     {
@@ -1180,8 +1177,7 @@ void test_ir()
         auto f1 = pprogram(prog1);
         _ASSERT(f1);
 
-        auto ir = Trans_Expr(f1.value().first);
-        auto exp = ir.exp;
+        auto ir = Trans_Expr(f1.value().first, builder);
     }
 
     /* {
@@ -1212,10 +1208,9 @@ void test_ir()
         _ASSERT(f1);
         _ASSERT(f1.value().second.empty());
 
-        auto ir = Trans_Expr(f1.value().first);
-        auto exp = ir.exp;
+        auto ir = Trans_Expr(f1.value().first, builder);
         std::vector<AS_Instr> instrs;
-        MunchExp(ir, instrs);
+        MunchExps_llvmlike(builder, instrs);
         for (size_t i = 0; i < instrs.size(); i++)
         {
             printf("%zd\n", instrs[i].index());

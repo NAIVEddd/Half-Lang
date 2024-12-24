@@ -144,12 +144,14 @@ int main(int argc, char* argv[])
         //output << line << std::endl;
     }
 
+
+    Builder builder;
     auto f1 = pprogram(prog);
-    auto ir = Trans_Expr(f1.value().first);
+    auto ir = Trans_Expr(f1.value().first, builder);
 
     // generate ast
     std::vector<AS_Instr> instrs;
-    MunchExp(ir, instrs);
+    MunchExps_llvmlike(builder, instrs);
 
     // analyze liveness
     auto g = Graph();

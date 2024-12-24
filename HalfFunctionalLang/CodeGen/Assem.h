@@ -55,17 +55,17 @@ struct AS_Jump
     {
         switch (op)
         {
-        case Half_Ir_BinOp::Oper::Less:
+        case Half_Ir_LlvmBinOp::Oper::Less:
             return "jl";
-        case Half_Ir_BinOp::Oper::LessEqual:
+        case Half_Ir_LlvmBinOp::Oper::LessEqual:
             return "jle";
-        case Half_Ir_BinOp::Oper::Greater:
+        case Half_Ir_LlvmBinOp::Oper::Greater:
             return "jg";
-        case Half_Ir_BinOp::Oper::GreaterEqual:
+        case Half_Ir_LlvmBinOp::Oper::GreaterEqual:
             return "jge";
-        case Half_Ir_BinOp::Oper::Equal:
+        case Half_Ir_LlvmBinOp::Oper::Equal:
             return "je";
-        case Half_Ir_BinOp::Oper::NotEqual:
+        case Half_Ir_LlvmBinOp::Oper::NotEqual:
             return "jne";
         default:
             break;
@@ -103,8 +103,6 @@ struct AS_Function
     }
 };
 
-void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
-void MunchExp(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs, std::stack<Temp::Label>& temps);
 void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs);
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
 std::string to_string(const AS_Instr& instr);
