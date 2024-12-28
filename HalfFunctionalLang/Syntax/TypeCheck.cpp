@@ -81,28 +81,28 @@ bool TypeCheck::Check(const Half_Expr& expr)
 //   TODO: complex type check
 Half_TypeDecl TypeCheck::GetType(const Half_Expr& expr)
 {
-    if (auto ptr = std::get_if<std::shared_ptr<Half_Var>>(&expr.expr))
-    {
-        auto t = scope->find_var((*ptr)->name());
-        return t.value_or(Half_TypeDecl());
-    }
-    else if (auto ptr = std::get_if<std::shared_ptr<Half_Value>>(&expr.expr))
-    {
-        if (Half_TypeDecl::BasicType::is_basic_t(**ptr))
-        {
-            auto t = (Half_TypeDecl::BasicType::BasicT)(*ptr)->value.index();
-            return Half_TypeDecl(Half_TypeDecl::BasicType(t));
-        }
-        return Half_TypeDecl();
-    }
-    else if (auto ptr = std::get_if<std::shared_ptr<Half_Op>>(&expr.expr))
-    {
-        return GetType(**ptr);
-    }
-    else if (auto ptr = std::get_if<std::shared_ptr<Half_Funcall>>(&expr.expr))
-    {
-        return GetType(**ptr);
-    }
+//    if (auto ptr = std::get_if<std::shared_ptr<Half_Var>>(&expr.expr))
+//    {
+//        auto t = scope->find_var((*ptr)->name());
+//        return t.value_or(Half_TypeDecl());
+//    }
+//    else if (auto ptr = std::get_if<std::shared_ptr<Half_Value>>(&expr.expr))
+//    {
+//        if (Half_TypeDecl::BasicType::is_basic_t(**ptr))
+//        {
+//            auto t = (Half_TypeDecl::BasicType::BasicT)(*ptr)->value.index();
+//            return Half_TypeDecl(Half_TypeDecl::BasicType(t));
+//        }
+//        return Half_TypeDecl();
+//    }
+//    else if (auto ptr = std::get_if<std::shared_ptr<Half_Op>>(&expr.expr))
+//    {
+//        return GetType(**ptr);
+//    }
+//    else if (auto ptr = std::get_if<std::shared_ptr<Half_Funcall>>(&expr.expr))
+//    {
+//        return GetType(**ptr);
+//    }
     return Half_TypeDecl();
 }
 
@@ -123,10 +123,11 @@ Half_TypeDecl TypeCheck::GetType(const Half_Var& expr)
 
 Half_TypeDecl TypeCheck::GetType(const Half_Value& expr)
 {
-    _ASSERT(expr.value.index() < 4);
-    auto bt = (Half_TypeDecl::BasicType::BasicT)expr.value.index();
-    printf("GetType(Half_Value) %d\n", (int)bt);
-    return Half_TypeDecl::BasicType(bt);
+//    _ASSERT(expr.value.index() < 4);
+//    auto bt = (Half_TypeDecl::BasicType::BasicT)expr.value.index();
+//    printf("GetType(Half_Value) %d\n", (int)bt);
+//    return Half_TypeDecl::BasicType(bt);
+    return{};
 }
 
 Half_TypeDecl TypeCheck::GetType(const Half_Funcall& expr)
@@ -153,6 +154,11 @@ bool TypeCheck::Check(const Half_Var& var)
     return t.has_value();
 }
 
+bool TypeCheck::Check(const Half_StructInit& expr)
+{
+    return false;
+}
+
 // Todo: support function template
 bool TypeCheck::Check(const Half_FuncDecl& func)
 {
@@ -164,7 +170,7 @@ bool TypeCheck::Check(const Half_FuncDecl& func)
         return false;
     }
     // check parameters type
-    std::vector<Half_TypeDecl::FuncType::TypeField> fields;
+    /*std::vector<Half_TypeDecl::FuncType::TypeField> fields;
     fields.reserve(func.parameters.size());
     for (auto& f : func.parameters)
     {
@@ -177,7 +183,8 @@ bool TypeCheck::Check(const Half_FuncDecl& func)
         fields.push_back({ f.var_name, f.type_name });
     }
     Half_TypeDecl::FuncType def(fields, func.return_type);
-    return scope->insert_func(func.name, def);
+    return scope->insert_func(func.name, def);*/
+    return false;
 }
 
 bool TypeCheck::Check(const Half_TypeDecl& type)
@@ -239,7 +246,7 @@ bool TypeCheck::Check(const Half_Funcall& funcall)
     if (auto ptr = std::get_if<Half_TypeDecl::FuncType>(&func_def.type))
     {
         auto& func = *ptr;
-        if (func.parameters.size() != funcall.args.size())
+        /*if (func.parameters.size() != funcall.args.size())
         {
             printf("Check(Half_Funcall) %s parameter size not match\n", funcall.name.c_str());
             return false;
@@ -258,7 +265,7 @@ bool TypeCheck::Check(const Half_Funcall& funcall)
                 printf("Check(Half_Funcall) %s parameter %zd type not match\n", funcall.name.c_str(), i);
                 return false;
             }
-        }
+        }*/
         return true;
     }
 

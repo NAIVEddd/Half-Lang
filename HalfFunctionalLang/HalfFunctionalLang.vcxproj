@@ -140,6 +140,7 @@
     <ClCompile Include="IR\IR.cpp" />
     <ClCompile Include="IR\Semant.cpp" />
     <ClCompile Include="IR\Symbol.cpp" />
+    <ClCompile Include="IR\Type.cpp" />
     <ClCompile Include="Parser\CharParsers.cpp" />
     <ClCompile Include="Parser\Operator.cpp" />
     <ClCompile Include="Parser\Parser.cpp" />
@@ -161,6 +162,7 @@
     <ClInclude Include="IR\Semant.h" />
     <ClInclude Include="IR\Symbol.h" />
     <ClInclude Include="IR\Temp.h" />
+    <ClInclude Include="IR\Type.h" />
     <ClInclude Include="Parser\CharParsers.h" />
     <ClInclude Include="Parser\Operator.h" />
     <ClInclude Include="Parser\Parser.h" />

@@ -31,11 +31,11 @@ struct TypeCheck
     std::shared_ptr<Scope> scope;
     TypeCheck() : scope(std::make_shared<Scope>())
     {
-        scope->insert_type("char", Half_TypeDecl(Half_TypeDecl::BasicType(Half_TypeDecl::BasicType::BasicT::Char)));
+    /*    scope->insert_type("char", Half_TypeDecl(Half_TypeDecl::BasicType(Half_TypeDecl::BasicType::BasicT::Char)));
         scope->insert_type("int", Half_TypeDecl(Half_TypeDecl::BasicType(Half_TypeDecl::BasicType::BasicT::Int)));
         scope->insert_type("float", Half_TypeDecl(Half_TypeDecl::BasicType(Half_TypeDecl::BasicType::BasicT::Float)));
         scope->insert_type("string", Half_TypeDecl(Half_TypeDecl::BasicType(Half_TypeDecl::BasicType::BasicT::String)));
-    }
+    */}
     TypeCheck(std::shared_ptr<Scope> s) : scope(std::move(s)) {}
     bool Check(const Half_Expr& expr);
     Half_TypeDecl GetType(const Half_Expr& expr);
@@ -49,6 +49,7 @@ private:
     Half_TypeDecl GetType(const Half_Op& expr);
 
     bool Check(const Half_Var& var);
+    bool Check(const Half_StructInit& expr);
     bool Check(const Half_FuncDecl& func);
     bool Check(const Half_TypeDecl& type);
     //bool Check(const Half_Type& type);

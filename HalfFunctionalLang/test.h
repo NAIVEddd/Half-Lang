@@ -740,6 +740,144 @@ void test_expr_parser()
         _ASSERT(t2.value().second.empty());
     }
 
+    // type usage
+    {
+        // there is a list type
+        std::string prog = "list";
+        auto t1 = ptypeuse(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+
+        // there is a array type, it's size is 10
+        std::string prog2 = "list[10]";
+        auto t2 = ptypeuse(prog2);
+        _ASSERT(t2);
+        _ASSERT(t2.value().second.empty());
+
+        // there is a ptr type
+        std::string prog3 = "ptr of list";
+        auto t3 = ptypeuse(prog3);
+        _ASSERT(t3);
+        _ASSERT(t3.value().second.empty());
+
+        // there is a array type, it's size is 10
+        std::string prog4 = "array of int[10]";
+        auto t4 = ptypeuse(prog4);
+        _ASSERT(t4);
+        _ASSERT(t4.value().second.empty());
+
+        // not support incomplete array type
+        std::string prog5 = "array of list";
+        auto t5 = ptypeuse(prog5);
+        _ASSERT(!t5);
+    }
+
+    // test ptr type
+    {
+        std::string prog = "ptr of int";
+        auto t1 = ppointertype(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+    // test array type
+    {
+        std::string prog = "array of int [10]";
+        auto t1 = parraytype(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+    // test struct body define
+    {
+        std::string prog = "{a:int, b:char}";
+        auto t1 = pstructbody(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+
+    {
+        std::string prog = "type list = {first:int, rest:list}";
+        auto t1 = ptypedecl(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+    {
+        std::string prog = "type list = array of int[10]";
+        auto t1 = ptypedecl(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+    {
+        std::string prog = "type list = array of int";
+        auto t1 = ptypedecl(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+    {
+        std::string prog = "type list = ptr of int";
+        auto t1 = ptypedecl(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+    {
+        std::string prog = "type list = int";
+        auto t1 = ptypedecl(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+    {
+        std::string prog = "type list = function ( ptr, ... ) : nil";
+        auto t1 = ptypedecl(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+
+        auto t2 = pexpr(prog);
+        _ASSERT(t2);
+        _ASSERT(t2.value().second.empty());
+    }
+
+    // test type size
+    {
+        std::shared_ptr<Table> global = std::make_shared<Table>();
+        Init_Basic_Type(global);
+        auto get_type_ptr = [&](const std::string& prog)
+            {
+                auto t1 = ptypedecl(prog);
+                _ASSERT(t1);
+                auto pty = Trans_Type(global, t1.value().first);
+                return pty;
+            };
+
+        {
+            std::string prog = "type a = int";
+            auto pty = get_type_ptr(prog);
+            _ASSERT(pty->GetSize() == 4);
+
+            std::string prog2 = "type b = char";
+            pty = get_type_ptr(prog2);
+            _ASSERT(pty->GetSize() == 1);
+
+            std::string prog3 = "type c = ptr of int";
+            pty = get_type_ptr(prog3);
+            _ASSERT(pty->GetSize() == 8);
+
+            std::string prog4 = "type d = array of int[10]";
+            pty = get_type_ptr(prog4);
+            _ASSERT(pty->GetSize() == 40);
+
+            std::string prog5 = "type e = d";
+            pty = get_type_ptr(prog5);
+            _ASSERT(pty->GetSize() == 40);
+
+            std::string prog6 = "type f = array of a[10]";
+            pty = get_type_ptr(prog6);
+            _ASSERT(pty->GetSize() == 40);
+
+            std::string prog7 = "type g = {x:int, y:int, z: int}";
+            pty = get_type_ptr(prog7);
+            _ASSERT(pty->GetSize() == 12);
+        }
+    }
+
     // test let
     {
         // test var def
@@ -853,6 +991,16 @@ function main() : int =
     else
         0
     end
+end)";
+
+    // test struct type
+    std::string prog8 =
+        R"(
+type point3 = {x:int, y:int, z:int}
+function main() : int =
+    let p1 = point3 {x=1, y=2, z=3}
+    let p2 = point3 { 3, 4, 5 }
+    p1.x + p1.y + p1.z + p2.x + p2.y + p2.z
 end)";
 
     /* {
@@ -1106,10 +1254,49 @@ end)";
             }
         }*/
 
-        {   // test for code gen
+        /*{   // test for code gen
             Builder b;
             auto check = TypeCheck();
             auto e = pprogram(prog7);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+            std::vector<AS_Instr> instrs;
+
+            auto ir_name = Trans_Expr(e.value().first, b);
+            printf("\n%s\n", to_string(ir_name.name).c_str());
+
+            MunchExps_llvmlike(b, instrs);
+
+            printf("\nCount %zd\n", instrs.size());
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                printf("%s", to_string(instrs[i]).c_str());
+            }
+            auto g = Graph();
+            g.initialize(instrs);
+            auto live = Liveness();
+            live.initialize(g);
+            printf("\nCount %zd\n", g.Nodes.size());
+            auto rlive = Liveness();
+            rlive.rinitialize(g);
+            live == rlive;
+            Color color(8);
+            color.initialize(live);
+            color.allocate();
+            color.print();
+            RegAlloc regalloc;
+            regalloc.allocate(g, live);
+            for (size_t i = 0; i < g.instrs.size(); i++)
+            {
+                printf("%s", to_string(g.instrs[i]).c_str());
+            }
+        }*/
+        {   // test for code gen
+            Builder b;
+            auto check = TypeCheck();
+            auto e = pprogram(prog8);
             if (check.Check(e.value().first))
             {
                 printf("TypeCheck success\n");

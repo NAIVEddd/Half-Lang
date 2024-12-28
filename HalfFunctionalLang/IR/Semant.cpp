@@ -2,6 +2,7 @@
 #include "Symbol.h"
 #include "Builder.h"
 #include <algorithm>
+#include <variant>
 
 
 /*auto IR_Make_Char =
@@ -19,6 +20,134 @@ auto IR_Make_Value =
         return std::visit(overload, value->value);
     };*/
 
+size_t Access_Var_Offset(std::shared_ptr<Table>& table, Half_Var& var, Half_Type_Info& type)
+{
+    if (auto psimple = std::get_if<Half_Var::SimpleVar>(&var.var))
+    {
+        return 0;
+    }
+    else if (auto pfield = std::get_if<Half_Var::FieldVar>(&var.var))
+    {
+        auto& field = *pfield;
+        auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&type.type);
+        _ASSERT(pstruct_ty);
+        auto base_offset = Access_Var_Offset(table, *field.var, type);
+        auto& struct_ty = *pstruct_ty;
+        auto& struct_field = struct_ty.GetField(field.id);
+        auto field_offset = struct_field.offset;
+        return base_offset + field_offset;
+    }
+    else if (auto psub = std::get_if<Half_Var::SubscriptVar>(&var.var))
+    {
+        return 0;
+    }
+}
+
+void Init_Basic_Type(std::shared_ptr<Table>& table)
+{
+    table->insert("char", std::make_shared<Half_Type_Info>(Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Char)));
+    table->insert("int", std::make_shared<Half_Type_Info>(Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Int)));
+    table->insert("float", std::make_shared<Half_Type_Info>(Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Float)));
+    table->insert("string", std::make_shared<Half_Type_Info>(Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::String)));
+}
+
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl& type)
+{
+    if (auto prename = std::get_if<Half_TypeDecl::RenameType>(&type.type))
+    {
+        auto target = Trans_Type(table, *prename->type);
+        table->insert(prename->name, target);
+        return table->findType(prename->name).value();
+    }
+    else if (auto ptype = std::get_if<Half_TypeDecl::BasicType>(&type.type))
+    {
+        // do nothing
+        auto opt_ty = table->findType(ptype->type_name);
+        return opt_ty.value_or(nullptr);
+    }
+    else if (auto ptype = std::get_if<Half_TypeDecl::name_ref_t>(&type.type))
+    {
+        auto opt_ty = table->findType(*ptype);
+        return opt_ty.value_or(nullptr);
+    }
+    else if (auto ptype = std::get_if<Half_TypeDecl::Ptr>(&type.type))
+    {
+        // do nothing
+        auto opt_ty = table->findType(ptype->target);
+        if (!opt_ty)
+        {
+            printf("Type not found: %s\n", ptype->target.c_str());
+            _ASSERT(false);
+        }
+        auto ptr = Half_Type_Info::PointerType(opt_ty.value());
+        return std::make_shared<Half_Type_Info>(ptr);
+    }
+    else if (auto ptype = std::get_if<Half_TypeDecl::TupleType>(&type.type))
+    {
+        for (auto& t : ptype->type_list)
+        {
+        }
+    }
+    else if (auto ptype = std::get_if<Half_TypeDecl::ArrayType>(&type.type))
+    {
+        auto opt_ty = table->findType(ptype->type_name);
+        if (!opt_ty)
+        {
+            printf("Type not found: %s\n", ptype->type_name.c_str());
+            _ASSERT(false);
+        }
+        auto arr = Half_Type_Info::ArrayType(opt_ty.value(), ptype->count);
+        return std::make_shared<Half_Type_Info>(arr);
+    }
+    else if (auto ptype = std::get_if<Half_TypeDecl::StructType>(&type.type))
+    {
+        std::vector<Half_Type_Info::StructType::TypePair> fields;
+        size_t offset = 0;
+        for (auto& f : ptype->field_list)
+        {
+            auto opt_ty = table->findType(f.type);
+            if (!opt_ty)
+            {
+                printf("Type not found: %s\n", f.type.c_str());
+                _ASSERT(false);
+            }
+            auto ty = opt_ty.value();
+            auto field = Half_Type_Info::StructType::TypePair(f.name, opt_ty.value(), offset);
+            fields.push_back(field);
+
+            // TODO: align
+            //    eg. int a, char b, int c, have to align char b to 4 bytes
+            offset += ty->GetSize();
+        }
+        auto str = Half_Type_Info::StructType(ptype->name, fields);
+        auto pty = std::make_shared<Half_Type_Info>(str);
+        table->insert(ptype->name, pty);
+        return pty;
+    }
+    else if (auto ptype = std::get_if<Half_TypeDecl::FuncType>(&type.type))
+    {
+        std::vector<std::shared_ptr<Half_Type_Info>> args;
+        for (auto& a : ptype->parameter_types)
+        {
+            auto opt_ty = table->findType(a);
+            if (!opt_ty)
+            {
+                printf("Type not found: %s\n", a.c_str());
+                _ASSERT(false);
+            }
+            args.push_back(opt_ty.value());
+        }
+        auto ret = table->findType(ptype->return_type);
+        if (!ret)
+        {
+            printf("Type not found: %s\n", ptype->return_type.c_str());
+            _ASSERT(false);
+        }
+        auto func = Half_Type_Info::FuncType(ret.value(), args);
+        return std::make_shared<Half_Type_Info>(func);
+    }
+    return nullptr;
+}
 
 Half_Ir_Name Trans_Var_Builder(std::shared_ptr<Table>& table, Half_Var& var, Builder& builder)
 {
@@ -28,7 +157,8 @@ Half_Ir_Name Trans_Var_Builder(std::shared_ptr<Table>& table, Half_Var& var, Bui
         _ASSERT(false);
         return Half_Ir_Name("Varabile not defined:(" + var.name() + ")");
     }
-    auto load = Half_Ir_Load(symbol.value().offset, Temp::NewLabel());
+    auto offset = Access_Var_Offset(table, var, symbol->type);
+    auto load = Half_Ir_Load(symbol->offset + offset, Temp::NewLabel());
     builder.AddExp(load);
     return load.out_label;
 }
@@ -79,6 +209,7 @@ Half_Ir_Name Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builde
 Half_Ir_Name Trans_Expr(Half_Expr& expr, Builder& builder)
 {
     auto table = std::make_shared<Table>();
+    Init_Basic_Type(table);
     auto exp_result = Trans_Expr(table, builder, expr);
     return exp_result;
 }
@@ -171,11 +302,38 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         auto s = Symbol();
         s.name = let.def.left.name();
 
+        // 1. temp solution for type(only support struct type)
+        // TODO: support other type
+        if (auto pstructinit = std::get_if<std::shared_ptr<Half_StructInit>>(&let.def.right.expr))
+        {
+            auto& structinit = **pstructinit;
+            auto pty = table->findType(structinit.type_name);
+            if (!pty)
+            {
+                printf("Type not found: %s\n", structinit.type_name.c_str());
+                _ASSERT(false);
+            }
+            auto& p = pty.value();
+            s.type = *p;
+        }
+        else
+        {
+            // for now, default type is int
+            s.type = *table->findType("int").value();
+        }
+        
+
         table->insert(s);
 
         _ASSERT(builder.block_alloc_entry != -1);
-        auto alloc = Half_Ir_Alloc(s.offset, Temp::NewLabel());
-        builder.AddExp(builder.block_alloc_entry, alloc);
+        // alloc space, one time 4 bytes
+        for (size_t i = 0; i < s.type.GetSize() / 4; i++)
+        {
+            auto alloc = Half_Ir_Alloc(s.offset + i * 4, Temp::NewLabel());
+            builder.AddExp(builder.block_alloc_entry, alloc);
+        }
+        /*auto alloc = Half_Ir_Alloc(s.offset, Temp::NewLabel());
+        builder.AddExp(builder.block_alloc_entry, alloc);*/
 
         auto assign = Half_Expr(let.def);
         return Trans_Expr(table, builder, assign);
@@ -206,6 +364,47 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
     else if (auto passign = std::get_if<std::shared_ptr<Half_Assign>>(&expr.expr))
     {
         auto& assign = **passign;
+
+        if (auto pstructinit = std::get_if<std::shared_ptr<Half_StructInit>>(&assign.right.expr))
+        {
+            auto& structinit = **pstructinit;
+            auto pty = table->findType(structinit.type_name);
+            if (!pty)
+            {
+                printf("Type not found: %s\n", structinit.type_name.c_str());
+                _ASSERT(false);
+            }
+
+            auto symbol = table->find(assign.left.name());
+            if (!symbol)
+            {
+                _ASSERT(false);
+                return Half_Ir_Name("Varabile not defined:(" + assign.left.name() + ")");
+            }
+            if (auto pstruct = std::get_if<Half_Type_Info::StructType>(&pty.value()->type))
+            {
+                auto& struct_ty = *pstruct;
+                for (size_t i = 0; i < structinit.fields.size(); i++)
+                {
+                    auto& init_field = structinit.fields[i];
+                    auto& ty_field = init_field.name.empty()? struct_ty.field_list[i] : struct_ty.GetField(init_field.name);
+                    // TODO: recursive call to translate the field
+                    // for now, only support simple type(first level of struct must be simple type)
+                    auto offset = symbol.value().offset + ty_field.offset;
+
+                    auto rval = Trans_Expr(table, builder, init_field.value);
+                    auto store = Half_Ir_Store(offset, rval.name);
+                    builder.AddExp(store);
+                }
+                return Half_Ir_Name("StructInit, should't use this label " + structinit.type_name);
+            }
+            else
+            {
+                printf("Type not supported: %s\n", structinit.type_name.c_str());
+                _ASSERT(false);
+            }
+        }
+        // simple type : int, char ... (size less than 4 or 8 bytes)
         auto rval = Trans_Expr(table, builder, assign.right);
         auto symbol = table->find(assign.left.name());
         if (!symbol)
@@ -235,7 +434,7 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
     {
         auto& func = **pfunc;
 
-        Stack stack;
+        Stack stack(table);
 
         auto current_block_size = builder.blocks.size();
         Half_Ir_Function func_ir;
@@ -256,6 +455,7 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         {
             Symbol smb;
             smb.name = func.parameters[i].var_name;
+            smb.type = *(table->findType(func.parameters[i].type_name).value());
             funcscope->insert(smb);
             funcscope->labels.insert({ smb.name, Temp::NewLabel(funcscope->labels.size()) });
             auto alloc = Half_Ir_Alloc(smb.offset, Temp::NewLabel());
@@ -279,6 +479,18 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         builder.insert_point = builder.blocks.size() - 1;
         builder.block_alloc_entry = -1;
         builder.AddExp(func_ir);
+
+        // 7. Add the function to the table
+        std::vector<std::string> parameter_types(func.parameters.size());
+        for (size_t i = 0; i < func.parameters.size(); i++)
+        {
+            parameter_types[i] = func.parameters[i].type_name;
+        }
+        auto func_type_decl = Half_TypeDecl(Half_TypeDecl::FuncType(func.return_type, parameter_types));
+        auto pfunc_ty = Trans_Type(table, func_type_decl);
+        auto& func_ty = std::get<Half_Type_Info::FuncType>(pfunc_ty->type);
+        table->insert(FunctionSymbol(func.name, func_ty));
+
         return Half_Ir_Name("FuncDecl, should't use this label " + func.name);
     }
     else if (auto pif = std::get_if<std::shared_ptr<Half_If>>(&expr.expr))
@@ -519,6 +731,8 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
     else if (auto ptype = std::get_if<std::shared_ptr<Half_TypeDecl>>(&expr.expr))
     {
         auto& type = **ptype;
+        Trans_Type(table, type);
+        return Half_Ir_Name();
     }
     else
     {

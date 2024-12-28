@@ -58,6 +58,11 @@ std::string Half_Var::name() const
     {
         return pvar->id;
     }
+    else if (auto pvar = std::get_if<FieldVar>(&var))
+    {
+        return pvar->var->name();
+    }
+    _ASSERT(false);
     return std::string();
 }
 
@@ -244,31 +249,6 @@ Def_Type& Def_Type::operator=(const Def_Type& o)
 {
     type = o.type;
     return *this;
-}
-
-Half_TypeDecl::Half_TypeDecl(const BasicType& t)
-    : type(t)
-{
-}
-
-Half_TypeDecl::Half_TypeDecl(const RenameType& t)
-    : type(t)
-{
-}
-
-Half_TypeDecl::Half_TypeDecl(const ArrayType& t)
-    : type(t)
-{
-}
-
-Half_TypeDecl::Half_TypeDecl(const StructType& t)
-    : type(t)
-{
-}
-
-Half_TypeDecl::Half_TypeDecl(const FuncType& t)
-    : type(t)
-{
 }
 
 Half_TypeDecl::Half_TypeDecl(const Half_TypeDecl& o)

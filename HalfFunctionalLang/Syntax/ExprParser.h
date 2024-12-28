@@ -41,6 +41,7 @@ ParserResult<Half_Value> pfloat(ParserInput s);
 ParserResult<Half_Value> pvalue(ParserInput s);
 
 ParserResult<std::string> pvariablename(ParserInput s);
+ParserResult<std::string> ptypename(ParserInput s);
 
 ParserResult<std::string> pfieldname(ParserInput s);
 
@@ -54,11 +55,27 @@ ParserResult<Half_Funcall> pfuncall(ParserInput s);
 
 ParserResult<Half_Op> pop(ParserInput s);
 
+ParserResult<Half_StructInit> pstructinitbody(ParserInput s);
+
 ParserResult<Half_Assign> passign(ParserInput s);
 
 ParserResult<Half_If> pif(ParserInput s);
 
 ParserResult<Half_FuncDecl> pfuncdecl(ParserInput s);
+
+ParserResult<Half_TypeDecl::Nil> pniltype(ParserInput s);
+ParserResult<Half_TypeDecl::TupleType> ptupletype(ParserInput s);
+ParserResult<Half_TypeDecl::Additional> padditionaltype(ParserInput s);
+ParserResult<Half_TypeDecl::BasicType> pbasictype(ParserInput s);
+ParserResult<Half_TypeDecl::Ptr> ppointertype(ParserInput s);
+ParserResult<Half_TypeDecl::IncompleteArrayType> pincompletetype(ParserInput s);
+ParserResult<Half_TypeDecl::ArrayType> parraytype(ParserInput s);
+ParserResult<Half_TypeDecl::StructType> pstructbody(ParserInput s);
+ParserResult<Half_TypeDecl::FuncType> pfunctype(ParserInput s);
+
+ParserResult<Half_TypeDecl> ptypeuse(ParserInput s);
+
+ParserResult<Half_TypeDecl> ptypedecl(ParserInput s);
 
 ParserResult<Def_Type> pdeftype(ParserInput s);
 

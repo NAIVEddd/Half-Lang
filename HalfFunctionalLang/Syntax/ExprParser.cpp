@@ -125,9 +125,14 @@ ParserResult<Half_Value> pvalue(ParserInput s)
 	return pv(s);
 }
 
+bool IsHeadChar(char c)
+{
+	return IsChar(c) || c == '_';
+}
+
 ParserResult<std::string> pvariablename(ParserInput s)
 {
-	auto head = AnyChar();
+	auto head = OneOf(IsHeadChar);
 	auto tail = Many(OneDigitOrChar());
 	Converter2<char, std::vector<char>, std::string> tostring =
 		[](char c, std::vector<char>&& cs)
@@ -140,6 +145,43 @@ ParserResult<std::string> pvariablename(ParserInput s)
 	if (!n || Keyword.contains(n.value().first))
 	{
 		return std::nullopt;
+	}
+	return n;
+}
+
+ParserResult<std::string> ptypename(ParserInput s)
+{
+	// parse '.'
+	//auto point = OneChar('.');
+	auto head = OneOf(IsHeadChar);
+	auto tail = Many(OneDigitOrChar());
+	Converter2<char, std::vector<char>, std::string> tostring =
+		[](char c, std::vector<char>&& cs)
+		{
+			std::string str = std::string(1, c) + std::string(cs.begin(), cs.end());
+			return str;
+		};
+	auto pname = Pipe2(head, tail, tostring);
+	auto n = pname(s);
+	//if (Keyword.contains(n.value().first))
+	//{
+	//	// print error message, row and col
+	//	printf("Error: %s is a keyword\n", n.value().first.c_str());
+	//	printf("    At Line: %zd, Col: %zd\n", s.current_pos.line, s.current_pos.column);
+ //       return std::nullopt;
+	//}
+
+	if (!n)
+	{
+        // not a string type name
+		// maybe '...' type
+        auto points = Many(OneChar('.'));
+		auto p = points(s);
+		if (!p || p.value().first.size() != 3)
+		{
+			return std::nullopt;
+		}
+		return std::make_pair("...", p.value().second);
 	}
 	return n;
 }
@@ -327,6 +369,68 @@ ParserResult<Half_Op> pop(ParserInput s)
 	return opparser(s);
 }
 
+Parser<Half_StructInit> GetStructInitParser()
+{
+    return [](ParserInput s) -> ParserResult<Half_StructInit>
+        {
+            auto space = Spaces();
+            
+            auto struct_name = ptypename(s);
+            if (!struct_name)
+            {
+                return std::nullopt;
+            }
+            s = struct_name.value().second;
+
+            auto popen = Between(space, space, OneChar('{'));
+            auto pclose = Between(space, space, OneChar('}'));
+            auto psep = Between(space, space, OneChar(','));
+            auto pequal = Between(space, space, OneChar('='));
+            auto pstructinitbody = SepBy(Between(space, space, pexpr), psep);
+
+            // 1. field = expr	{a = 1, c = 3, b = x}
+            // 2. var or value	{1, 2, c}
+            Converter2<std::string, Half_Expr, Half_StructInit::FieldInit> toFieldInit =
+                [](std::string name, Half_Expr expr)
+                {
+                    return Half_StructInit::FieldInit(name, expr);
+                };
+            Converter<Half_Var, Half_StructInit::FieldInit> varToFieldInit =
+				[](Half_Var v)
+				{
+					return Half_StructInit::FieldInit("", v);
+				};
+            Converter<Half_Value, Half_StructInit::FieldInit> valueToFieldInit =
+                [](Half_Value v)
+                {
+                    return Half_StructInit::FieldInit("", v);
+                };
+			Parser<std::string> pname = OnlyFirst(pvariablename, pequal);
+            Parser<Half_StructInit::FieldInit> assign = Pipe2(pname, pexpr, toFieldInit);
+			Parser<Half_StructInit::FieldInit> var = Pipe(pvar, varToFieldInit);
+            Parser<Half_StructInit::FieldInit> value = Pipe(pvalue, valueToFieldInit);
+			auto ponefield = Choice(std::vector{ assign, var, value });
+            auto pfield = SepBy(ponefield, psep);
+            auto pbody = Between(popen, pclose, pfield);
+
+            auto body = pbody(s);
+            if (!body)
+            {
+                return std::nullopt;
+            }
+            auto& field_exprs = body.value().first;
+
+            return std::make_pair(Half_StructInit(struct_name.value().first, field_exprs), body.value().second);
+        };
+}
+
+ParserResult<Half_StructInit> pstructinitbody(ParserInput s)
+{
+	auto parsestructinit = GetStructInitParser();
+    auto res = parsestructinit(s);
+	return res;
+}
+
 Parser<Half_Assign> GetAssignParser()
 {
 	return [](ParserInput s)
@@ -504,10 +608,469 @@ ParserResult<Half_FuncDecl> pfuncdecl(ParserInput s)
 	return parser(s);
 }
 
+ParserResult<int> pconstint(ParserInput s)
+{
+	std::vector<char> str;
+	auto istr = Many1(OneDigit())(s);
+	if (!istr)
+	{
+		return std::nullopt;
+	}
+	str.resize(istr.value().first.size());
+	std::copy(istr.value().first.begin(), istr.value().first.end(),
+		&str[0]);
+	auto i = std::stoi(std::string(str.begin(), str.end()));
+	return std::make_pair(i, istr.value().second);
+}
+
+ParserResult<Half_TypeDecl::Nil> pniltype(ParserInput s)
+{
+	auto space = Spaces();
+	auto keynil = Between(space, space, String("nil"));
+	auto rnil = keynil(s);
+	if (!rnil)
+	{
+		return std::nullopt;
+	}
+	return std::make_pair(Half_TypeDecl::Nil(), rnil.value().second);
+}
+// ParserResult<Half_TypeDecl::RenameType> prenametype(ParserInput s)
+// {
+// 	auto space = Spaces();
+// 	auto keytype = Between(space, space, String("type"));
+// 	auto rtype = keytype(s);
+// 	if (!rtype)
+// 	{
+// 		return std::nullopt;
+// 	}
+// 	s = rtype.value().second;
+
+// 	auto keyequal = Between(space, space, OneChar('='));
+// 	auto requal = keyequal(s);
+// 	if (!requal)
+// 	{
+// 		return std::nullopt;
+// 	}
+// 	s = requal.value().second;
+
+// 	auto keyname = pvariablename;
+// 	auto rname = keyname(s);
+// 	if (!rname)
+// 	{
+// 		return std::nullopt;
+// 	}
+// 	return std::make_pair(Half_TypeDecl::RenameType(rname.value().first), rname.value().second);
+// }
+// ParserResult<Half_TypeDecl::TupleType> ptupletype(ParserInput s);
+ParserResult<Half_TypeDecl::Additional> padditionaltype(ParserInput s)
+{
+	auto space = Spaces();
+	auto keyadditional = Between(space, space, String("..."));
+	auto radditional = keyadditional(s);
+	if (!radditional)
+	{
+		return std::nullopt;
+	}
+	return std::make_pair(Half_TypeDecl::Additional(), radditional.value().second);
+}
+
+ParserResult<Half_TypeDecl::Ptr> ppointertype(ParserInput s)
+{
+	// parse pointer type like 'ptr of int'
+	auto space = Spaces();
+	auto keypointer = Between(space, space, String("ptr"));
+	auto rpointer = keypointer(s);
+	if (!rpointer)
+	{
+		return std::nullopt;
+	}
+	s = rpointer.value().second;
+
+	auto keyof = Between(space, space, String("of"));
+	auto rkeyof = keyof(s);
+	if (!rkeyof)
+	{
+		return std::nullopt;
+	}
+	s = rkeyof.value().second;
+
+	auto ptype = pvariablename;
+	auto rtype = ptype(s);
+	if (!rtype)
+	{
+		return std::nullopt;
+	}
+	return std::make_pair(Half_TypeDecl::Ptr(rtype.value().first), rtype.value().second);
+}
+
+ParserResult<Half_TypeDecl::IncompleteArrayType> pincompletetype(ParserInput s)
+{
+	auto space = Spaces();
+	auto keyarray = Between(space, space, String("array"));
+	auto rarray = keyarray(s);
+	if (!rarray)
+	{
+		return std::nullopt;
+	}
+	s = rarray.value().second;
+
+	auto keyof = Between(space, space, String("of"));
+	auto rkeyof = keyof(s);
+	if (!rkeyof)
+	{
+		return std::nullopt;
+	}
+	s = rkeyof.value().second;
+
+	auto ptype = pvariablename;
+	auto rtype = ptype(s);
+	if (!rtype)
+	{
+		return std::nullopt;
+	}
+	return std::make_pair(Half_TypeDecl::IncompleteArrayType(rtype.value().first), rtype.value().second);
+}
+
+ParserResult<Half_TypeDecl::ArrayType> parraytype(ParserInput s)
+{
+	auto space = Spaces();
+	auto keyarray = Between(space, space, String("array"));
+	auto rarray = keyarray(s);
+	if (!rarray)
+	{
+		return std::nullopt;
+	}
+	s = rarray.value().second;
+	
+	auto keyopen = Between(space, space, OneChar('['));
+	auto keyclose = Between(space, space, OneChar(']'));
+	auto keyof = Between(space, space, String("of"));
+	auto keycolon = Between(space, space, OneChar(':'));
+	auto keysep = Between(space, space, OneChar(','));
+	auto pname = Between(space, space, pvariablename);
+	Converter3<std::string, std::string, int, Half_TypeDecl::ArrayType> toarraytype =
+		[](std::string, std::string t, int sz)
+		{
+			return Half_TypeDecl::ArrayType(t, sz);
+		};
+	Converter3<char, int, char, int> tosize =
+		[](char, int s, char)
+		{
+			return s;
+		};
+	auto psize = Pipe3(keyopen, pconstint, keyclose, tosize);
+	// parse array type like 'array of int [10]'
+	auto ptype = Pipe3(keyof, pname, psize, toarraytype);
+	auto rtype = ptype(s);
+	if (!rtype)
+	{
+		return std::nullopt;
+	}
+	return rtype;
+}
+
+ParserResult<Half_TypeDecl::StructType> pstructbody(ParserInput s)
+{
+	auto space = Spaces();
+	auto rspace = space(s);
+	s = rspace.value().second;
+	if(s[0] != '{')
+	{
+		return std::nullopt;
+	}
+
+	auto keyopen = Between(space, space, OneChar('{'));
+	auto keyclose = Between(space, space, OneChar('}'));
+	auto keyinter = Between(space, space, OneChar(':'));
+	auto keysep = Between(space, space, OneChar(','));
+	auto pname = Between(space, space, pvariablename);
+	Converter3<std::string, char, std::string, Half_TypeDecl::StructType::TypePair> totypepair =
+		[](std::string n, char _, std::string t)
+		{
+			return Half_TypeDecl::StructType::TypePair(n, t);
+		};
+	auto ppair = Pipe3(pname, keyinter, pname, totypepair);
+	auto pmanypair = SepBy(ppair, keysep);
+	Converter3<char, std::vector<Half_TypeDecl::StructType::TypePair>, char, std::vector<Half_TypeDecl::StructType::TypePair>> tostructtype =
+		[](char, std::vector<Half_TypeDecl::StructType::TypePair> tys, char)
+		{
+			return tys;
+		};
+	auto pbody = Pipe3(keyopen, pmanypair, keyclose, tostructtype);
+
+	auto rbody = pbody(s);
+	if (!rbody)
+	{
+		printf("Parse struct body failed! at line:%zd col:%zd\n",
+			s.current_pos.line, s.current_pos.column);
+		return std::nullopt;
+	}
+	Half_TypeDecl::StructType st("", rbody.value().first);
+	s = rbody.value().second;
+
+	return std::make_pair(st, s);
+}
+
+ParserResult<Half_TypeDecl::FuncType> pfunctype(ParserInput s)
+{
+	// parse function type like 'function (int, char) : int'
+	//   TODO: or 'function int -> char'
+	auto space = Spaces();
+	auto keyfunc = Between(space, space, String("function"));
+	auto rfunc = keyfunc(s);
+	if (!rfunc)
+	{
+		return std::nullopt;
+	}
+	s = rfunc.value().second;
+
+	auto keyopen = Between(space, space, OneChar('('));
+	auto keyclose = Between(space, space, OneChar(')'));
+	auto keycolon = Between(space, space, OneChar(':'));
+	auto keyarrow = Between(space, space, String("->"));
+	auto keysep = Between(space, space, OneChar(','));
+	auto pname = Between(space, space, ptypename);
+	auto pmany_arg_types = SepBy(pname, keysep);
+	auto parg_types = Between(keyopen, keyclose, pmany_arg_types);
+	auto rarg_types = parg_types(s);
+	if (!rarg_types)
+	{
+		printf("Parse function arguments failed! at line:%zd col:%zd\n",
+			s.current_pos.line, s.current_pos.column);
+		return std::nullopt;
+	}
+	s = rarg_types.value().second;
+
+	auto prettype = keycolon > pname;
+	auto rrettype = prettype(s);
+	if (!rrettype)
+	{
+		printf("Parse function return type failed! at line:%zd col:%zd\n",
+			s.current_pos.line, s.current_pos.column);
+		return std::nullopt;
+	}
+	s = rrettype.value().second;
+	auto res = Half_TypeDecl::FuncType(rrettype.value().first, rarg_types.value().first);
+	return std::make_pair(res, s);
+}
+
+ParserResult<Half_TypeDecl> ptypeuse(ParserInput s)
+{
+	// parse type like 'int' or 'int_array [10]' or 'array of int [10]' or 'ptr of int'
+	auto space = Spaces();
+	auto keyarray = Between(space, space, String("array"));
+	auto keyptr = Between(space, space, String("ptr"));
+	auto keyof = Between(space, space, String("of"));
+	auto keyopen = Between(space, space, OneChar('['));
+	auto keyclose = Between(space, space, OneChar(']'));
+	auto keycolon = Between(space, space, OneChar(':'));
+	auto keysep = Between(space, space, OneChar(','));
+	auto pname = Between(space, space, pvariablename);
+	auto psize = Between(keyopen, keyclose, pconstint);
+	
+	{	// 'int_array [10]'
+		Converter2<std::string, int, Half_TypeDecl::CompleteArrayType> toarraytype =
+			[](std::string t, int sz)
+			{
+				return Half_TypeDecl::CompleteArrayType(t, sz);
+			};
+		auto pcompletearraytype = Pipe2(pname, psize, toarraytype);
+		// 'int_array [10]'
+		auto rcompletearraytype = pcompletearraytype(s);
+		if (rcompletearraytype)
+		{
+			return rcompletearraytype;
+		}
+	}
+	
+	{	// 'array of int [10]'
+		auto parray_t = keyarray > keyof > pname;
+		Converter2<std::string, int, Half_TypeDecl::ArrayType> make_type =
+			[](std::string t, int sz)
+			{
+				return Half_TypeDecl::ArrayType(t, sz);
+			};
+		auto parray = Pipe2(parray_t, psize, make_type);
+		auto rarray = parray(s);
+		if (rarray)
+		{
+			return rarray;
+		}
+	}
+
+	{	// 'ptr of int'
+		auto pptr = keyptr > keyof > pname;
+		Converter<std::string, Half_TypeDecl::Ptr> make_ptr_type =
+			[](std::string t)
+			{
+				return Half_TypeDecl::Ptr(t);
+			};
+		auto ppointer = Pipe(pptr, make_ptr_type);
+		auto rpointer = ppointer(s);
+		if (rpointer)
+		{
+			return rpointer;
+		}
+	}
+
+	// 'int'
+	auto rname = pname(s);
+	if(!rname || Keyword.contains(rname.value().first))
+	{
+		return std::nullopt;
+	}
+	return std::make_pair(Half_TypeDecl(rname.value().first), rname.value().second);
+}
+
+ParserResult<Half_TypeDecl> ptypedecl(ParserInput s)
+{
+	auto space = Spaces();
+	auto keytype = Between(space, space, String("type"));
+	auto rtype = keytype(s);
+	if (!rtype)
+	{
+		return std::nullopt;
+	}
+	s = rtype.value().second;
+
+	auto keyequal = Between(space, space, OneChar('='));
+	auto pname = Between(space, space, pvariablename);
+
+	auto rtypename = OnlyFirst(pname, keyequal)(s);
+	if (!rtypename)
+	{
+		printf("Parse type name failed! at line:%zd col:%zd\n",
+			s.current_pos.line, s.current_pos.column);
+		return std::nullopt;
+	}
+	s = rtypename.value().second;
+
+	{	// check if type is struct
+		auto rbody = pstructbody(s);
+		if (rbody)
+		{
+			auto structtype = rbody.value().first;
+			structtype.name = rtypename.value().first;
+			return std::make_pair(Half_TypeDecl(structtype), rbody.value().second);
+		}
+	}
+
+		// check if type is a rename_type
+	    //    like 'function (int, char) : int' (function type)
+		//		or 'type a = ptr of int'
+		//   	or 'type a = nil'
+		//   	or 'type a = array of int [10]'
+		//   	or 'type a = array of int'
+		//   	or 'type a = int_array [10]'
+		//   	or 'type a = int_array'
+	{	// rename type
+		{  // parse like 'type a = function (ptr, ...) : int' or 'type a = int'
+			auto rtype = pfunctype(s);
+			if (rtype)
+			{
+				auto res = Half_TypeDecl::RenameType(rtypename.value().first, rtype.value().first);
+				return std::make_pair(res, rtype.value().second);
+			}
+		}
+		{  //   parse like 'type a = ptr of int'
+			auto rtype = ppointertype(s);
+			if (rtype)
+			{
+				auto res = Half_TypeDecl::RenameType(rtypename.value().first, rtype.value().first);
+				return std::make_pair(res, rtype.value().second);
+			}
+		}
+
+		{  //   parse like 'type a = nil'
+			auto rtype = pniltype(s);
+			if (rtype)
+			{
+				auto res = Half_TypeDecl::RenameType(rtypename.value().first, rtype.value().first);
+				return std::make_pair(res, rtype.value().second);
+			}
+		}
+
+		// syntax like 'type a = ...' is not supported
+		{  //   parse like 'type a = ...'
+			// auto rtype = padditionaltype(s);
+			// if (rtype)
+			// {
+			// 	auto res = Half_TypeDecl::RenameType(rtypename.value().first, rtype.value().first);
+			// 	return std::make_pair(res, rtype.value().second);
+			// }
+		}
+
+		{  //   parse like 'type a = array of int [10]'
+			auto rtype = parraytype(s);
+			if (rtype)
+			{
+				auto res = Half_TypeDecl::RenameType(rtypename.value().first, rtype.value().first);
+				return std::make_pair(res, rtype.value().second);
+			}
+		}
+
+		{  //   parse like 'type a = array of int'
+			auto rtype = pincompletetype(s);
+			if (rtype)
+			{
+				auto res = Half_TypeDecl::RenameType(rtypename.value().first, rtype.value().first);
+				return std::make_pair(res, rtype.value().second);
+			}
+		}
+
+		{  //   parse like 'type a = int_array [10]' or 'type a = int_array'
+		    do
+			{
+				auto rincompletetype = pname(s);
+				if (!rincompletetype)
+				{
+					break;
+				}
+				s = rincompletetype.value().second;
+
+				// parse '[' int ']'
+				auto keyopen = Between(space, space, OneChar('['));
+				auto keyclose = Between(space, space, OneChar(']'));
+				Converter3<char, int, char, int> tosize =
+					[](char, int s, char)
+					{
+						return s;
+					};
+				auto psize = Pipe3(keyopen, pconstint, keyclose, tosize);
+				auto rsize = psize(s);
+				// if size is not found, then it is a simple rename type
+				// 	like 'type a = int_array'
+				if (!rsize)
+				{
+					auto res = Half_TypeDecl::RenameType(rtypename.value().first, rincompletetype.value().first);
+					return std::make_pair(res, s);
+				}
+				// if size is found, then it is a complete array type
+				// 	like 'type a = int_array [10]'
+				Half_TypeDecl::CompleteArrayType ArrayType(rincompletetype.value().first, rsize.value().first);
+				auto res = Half_TypeDecl::RenameType(rtypename.value().first, ArrayType);
+				return std::make_pair(res, rsize.value().second);
+			} while (false);
+		}
+	}
+
+	// If none of the conditions are met, return std::nullopt
+	printf("Parse type failed! at line:%zd col:%zd\n",
+		s.current_pos.line, s.current_pos.column);
+	return std::nullopt;
+}
+
 ParserResult<Def_Type> pdeftype(ParserInput s)
 {
 	auto space = Spaces();
 	auto keytype = Between(space, space, String("type"));
+	auto rtype = keytype(s);
+	if (!rtype)
+	{
+		return std::nullopt;
+	}
+	s = rtype.value().second;
+
 	auto keyequal = Between(space, space, OneChar('='));
 	auto keyopen = Between(space, space, OneChar('{'));
 	auto keyclose = Between(space, space, OneChar('}'));
@@ -527,13 +1090,6 @@ ParserResult<Def_Type> pdeftype(ParserInput s)
 			return tys;
 		};
 	auto pbody = Pipe3(keyopen, pmanypair, keyclose, tostructtype);
-
-	auto rtype = keytype(s);
-	if (!rtype)
-	{
-		return std::nullopt;
-	}
-	s = rtype.value().second;
 
 	Converter2<std::string, std::vector<Def_Type::StructType::TypePair>, Def_Type> totype =
 		[](std::string n, std::vector<Def_Type::StructType::TypePair> ts)
@@ -720,10 +1276,13 @@ Parser<Half_Expr> GetExprParser()
 			auto varparser = PipeExpr(pvar);
 			auto valueparser = PipeExpr(pvalue);
 			auto fundefparser = PipeExpr(pfuncdecl);
+            auto typeparser = PipeExpr(ptypedecl);
+            auto structinitparser = PipeExpr(pstructinitbody);
 
 			auto c = Choice(std::vector{
-				fundefparser,
+				fundefparser, typeparser,
 				letparser, assignparser, ifparser, forparser, whileparser,
+                structinitparser,
 				opparser, funcallparser, varparser, valueparser, });
 			auto r = c(s);
 			if (!r)

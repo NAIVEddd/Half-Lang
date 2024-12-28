@@ -75,6 +75,9 @@
     <ClCompile Include="Syntax\Base.cpp">
       <Filter>Syntax</Filter>
     </ClCompile>
+    <ClCompile Include="IR\Type.cpp">
+      <Filter>IR</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Parser\Parser.h">
@@ -135,6 +138,9 @@
       <Filter>IR</Filter>
     </ClInclude>
     <ClInclude Include="IR\Builder.h">
+      <Filter>IR</Filter>
+    </ClInclude>
+    <ClInclude Include="IR\Type.h">
       <Filter>IR</Filter>
     </ClInclude>
   </ItemGroup>
