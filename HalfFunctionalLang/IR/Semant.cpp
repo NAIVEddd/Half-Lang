@@ -39,8 +39,17 @@ size_t Access_Var_Offset(std::shared_ptr<Table>& table, Half_Var& var, Half_Type
     }
     else if (auto psub = std::get_if<Half_Var::SubscriptVar>(&var.var))
     {
+        auto& sub = *psub;
+        auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&type.type);
+        _ASSERT(parray_ty);
+        auto base_offset = Access_Var_Offset(table, *sub.var, type);
+        auto one_elem_size = parray_ty->type->GetSize();
+        //auto offset = one_elem_size * sub.index;
         return 0;
     }
+
+    _ASSERT(false);
+    return 0;
 }
 
 void Init_Basic_Type(std::shared_ptr<Table>& table)
@@ -156,6 +165,22 @@ Half_Ir_Name Trans_Var_Builder(std::shared_ptr<Table>& table, Half_Var& var, Bui
     {
         _ASSERT(false);
         return Half_Ir_Name("Varabile not defined:(" + var.name() + ")");
+    }
+    if (auto parray = std::get_if<Half_Var::SubscriptVar>(&var.var))
+    {
+        auto& array = *parray;
+        auto offset = symbol.value().offset;
+        auto i = Trans_Expr(table, builder, *array.index);
+        
+        auto sz = 0;
+        if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
+        {
+            _ASSERT(parray_ty);
+            sz = parray_ty->type->GetSize();
+        }
+        Half_Ir_ArrayElemLoad load(offset, i.name, sz, Temp::NewLabel());
+        builder.AddExp(load);
+        return load.out_label;
     }
     auto offset = Access_Var_Offset(table, var, symbol->type);
     auto load = Half_Ir_Load(symbol->offset + offset, Temp::NewLabel());
@@ -316,6 +341,18 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
             auto& p = pty.value();
             s.type = *p;
         }
+        else if (auto parrayinit = std::get_if<std::shared_ptr<Half_ArrayInit>>(&let.def.right.expr))
+        {
+            auto& arrayinit = **parrayinit;
+            auto pty = table->findType(arrayinit.type_name);
+            if (!pty)
+            {
+                printf("Type not found: %s\n", arrayinit.type_name.c_str());
+                _ASSERT(false);
+            }
+            auto& p = pty.value();
+            s.type = *p;
+        }
         else
         {
             // for now, default type is int
@@ -401,6 +438,44 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
             else
             {
                 printf("Type not supported: %s\n", structinit.type_name.c_str());
+                _ASSERT(false);
+            }
+        }
+        else if (auto parrayinit = std::get_if<std::shared_ptr<Half_ArrayInit>>(&assign.right.expr))
+        {
+            auto& arrayinit = **parrayinit;
+            auto pty = table->findType(arrayinit.type_name);
+            if (!pty)
+            {
+                printf("Type not found: %s\n", arrayinit.type_name.c_str());
+                _ASSERT(false);
+            }
+            auto symbol = table->find(assign.left.name());
+            if (!symbol)
+            {
+                _ASSERT(false);
+                return Half_Ir_Name("Varabile not defined:(" + assign.left.name() + ")");
+            }
+            if (auto parray = std::get_if<Half_Type_Info::ArrayType>(&pty.value()->type))
+            {
+                auto& array_ty = *parray;
+                auto array_offset = symbol.value().offset;
+                auto elem_size = array_ty.type->GetSize();
+
+                for (size_t i = 0; i < arrayinit.values.size(); i++)
+                {
+                    auto ci = Half_Ir_Const(i);
+
+                    builder.AddExp(ci);
+                    auto n = Trans_Expr(table, builder, arrayinit.values[i]);
+                    Half_Ir_ArrayElemStore store(array_offset, ci.out_label, elem_size, n.name);
+                    builder.AddExp(store);
+                }
+                return Half_Ir_Name("ArrayInit, should't use this label " + arrayinit.type_name);
+            }
+            else
+            {
+                printf("Type not supported: %s\n", arrayinit.type_name.c_str());
                 _ASSERT(false);
             }
         }

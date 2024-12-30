@@ -35,6 +35,34 @@ struct AS_Move
         : dst(d.name), src(s.name) {}
 };
 
+// load data from memory
+// movl offset(%rsp, src, 4), dst
+struct AS_ArrayLoad
+{
+    Temp::Label dst;
+    Temp::Label src;
+    size_t offset;
+    size_t data_size;
+    AS_ArrayLoad(Temp::Label d, Temp::Label s, size_t off, size_t sz)
+        : dst(d), src(s), offset(off), data_size(sz) {}
+    AS_ArrayLoad(const AS_ArrayLoad& o)
+        : dst(o.dst), src(o.src), offset(o.offset), data_size(o.data_size) {}
+};
+
+// store data to memory
+// movl src, offset(%rsp, dst, 4)
+struct AS_ArrayStore
+{
+    Temp::Label dst;
+    Temp::Label src;
+    size_t offset;
+    size_t data_size;
+    AS_ArrayStore(Temp::Label d, Temp::Label s, size_t off, size_t sz)
+        : dst(d), src(s), offset(off), data_size(sz) {}
+    AS_ArrayStore(const AS_ArrayStore& o)
+        : dst(o.dst), src(o.src), offset(o.offset), data_size(o.data_size) {}
+};
+
 struct AS_Label
 {
     Temp::Label label;
@@ -92,7 +120,7 @@ struct AS_Return
     AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
-using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_Jump, AS_Label, AS_Call, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
 struct AS_Function
 {

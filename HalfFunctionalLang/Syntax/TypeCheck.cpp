@@ -154,6 +154,11 @@ bool TypeCheck::Check(const Half_Var& var)
     return t.has_value();
 }
 
+bool TypeCheck::Check(const Half_ArrayInit& expr)
+{
+    return false;
+}
+
 bool TypeCheck::Check(const Half_StructInit& expr)
 {
     return false;

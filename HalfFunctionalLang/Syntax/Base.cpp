@@ -62,6 +62,10 @@ std::string Half_Var::name() const
     {
         return pvar->var->name();
     }
+    else if (auto pvar = std::get_if<SubscriptVar>(&var))
+    {
+        return pvar->var->name();
+    }
     _ASSERT(false);
     return std::string();
 }

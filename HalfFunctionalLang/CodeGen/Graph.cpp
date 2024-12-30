@@ -44,6 +44,13 @@ std::vector<Temp::Label> Node::Def() const
     {
         labels.push_back(pmv->dst);
     }
+    else if (auto pmv = std::get_if<AS_ArrayLoad>(&info))
+    {
+        labels.push_back(pmv->dst);
+    }
+    else if (auto pmv = std::get_if<AS_ArrayStore>(&info))
+    {
+    }
     else if (auto pjmp = std::get_if<AS_Jump>(&info))
     {
 
@@ -74,6 +81,15 @@ std::vector<Temp::Label> Node::Use() const
     else if (auto pmv = std::get_if<AS_Move>(&info))
     {
         labels.push_back(pmv->src);
+    }
+    else if (auto pmv = std::get_if<AS_ArrayLoad>(&info))
+    {
+        labels.push_back(pmv->src);
+    }
+    else if (auto pmv = std::get_if<AS_ArrayStore>(&info))
+    {
+        labels.push_back(pmv->src);
+        labels.push_back(pmv->dst);
     }
     else if (auto pjmp = std::get_if<AS_Jump>(&info))
     {

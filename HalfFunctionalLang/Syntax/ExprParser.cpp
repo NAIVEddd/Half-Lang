@@ -369,6 +369,41 @@ ParserResult<Half_Op> pop(ParserInput s)
 	return opparser(s);
 }
 
+Parser<Half_ArrayInit> GetArrayInitParser()
+{
+    return [](ParserInput s) -> ParserResult<Half_ArrayInit>
+        {
+            auto space = Spaces();
+
+			auto array_elem_name = ptypename(s);
+			if (!array_elem_name)
+			{
+				return std::nullopt;
+			}
+			s = array_elem_name.value().second;
+
+            auto popen = Between(space, space, OneChar('['));
+            auto pclose = Between(space, space, OneChar(']'));
+            auto psep = Between(space, space, OneChar(','));
+            auto parrayinitbody = SepBy(Between(space, space, pexpr), psep);
+            auto pbody = Between(popen, pclose, parrayinitbody);
+            auto body = pbody(s);
+            if (!body)
+            {
+                return std::nullopt;
+            }
+            auto& exprs = body.value().first;
+            return std::make_pair(Half_ArrayInit(array_elem_name.value().first, exprs), body.value().second);
+        };
+}
+
+ParserResult<Half_ArrayInit> parrayinit(ParserInput s)
+{
+    static auto parsearrayinit = GetArrayInitParser();
+    auto res = parsearrayinit(s);
+	return res;
+}
+
 Parser<Half_StructInit> GetStructInitParser()
 {
     return [](ParserInput s) -> ParserResult<Half_StructInit>
@@ -426,7 +461,7 @@ Parser<Half_StructInit> GetStructInitParser()
 
 ParserResult<Half_StructInit> pstructinitbody(ParserInput s)
 {
-	auto parsestructinit = GetStructInitParser();
+	static auto parsestructinit = GetStructInitParser();
     auto res = parsestructinit(s);
 	return res;
 }
@@ -1278,12 +1313,13 @@ Parser<Half_Expr> GetExprParser()
 			auto fundefparser = PipeExpr(pfuncdecl);
             auto typeparser = PipeExpr(ptypedecl);
             auto structinitparser = PipeExpr(pstructinitbody);
+            auto arrayinitparser = PipeExpr(parrayinit);
 
 			auto c = Choice(std::vector{
 				fundefparser, typeparser,
 				letparser, assignparser, ifparser, forparser, whileparser,
-                structinitparser,
-				opparser, funcallparser, varparser, valueparser, });
+                opparser, structinitparser, arrayinitparser,
+				funcallparser, varparser, valueparser, });
 			auto r = c(s);
 			if (!r)
 			{

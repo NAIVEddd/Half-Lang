@@ -30,6 +30,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+out/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
@@ -138,6 +139,7 @@ _TeamCity*
 !.axoCover/settings.json
 
 # Visual Studio code coverage results
+.vscode/
 *.coverage
 *.coveragexml
 

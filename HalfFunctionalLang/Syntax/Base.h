@@ -23,6 +23,7 @@ const std::set<std::string> Keyword =
 struct Half_Expr;
 struct Half_Var;
 struct Half_Value;
+struct Half_ArrayInit;
 struct Half_StructInit;
 struct Half_Funcall;
 struct Half_Op;
@@ -56,6 +57,7 @@ struct Half_Expr
     using Expr = std::variant<
         std::shared_ptr<Half_Var>,    // rename to VarDecl
         std::shared_ptr<Half_Value>,    // rename to ValueLiteral
+        std::shared_ptr<Half_ArrayInit>,
         std::shared_ptr<Half_StructInit>,
         std::shared_ptr<Half_Funcall>,
         std::shared_ptr<Half_Op>,
@@ -163,6 +165,15 @@ struct Half_Value
     Half_Value& operator=(const Half_Value& v);
 
     ValueT value;
+};
+
+struct Half_ArrayInit
+{
+    std::string type_name;
+    std::vector<Half_Expr> values;
+    Half_ArrayInit() = default;
+    Half_ArrayInit(std::string t, std::vector<Half_Expr>& v) : type_name(std::move(t)), values(std::move(v)) {}
+    Half_ArrayInit(const Half_ArrayInit& o) : type_name(o.type_name), values(o.values) {}
 };
 
 struct Half_StructInit

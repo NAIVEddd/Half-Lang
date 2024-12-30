@@ -62,6 +62,20 @@ struct RegAlloc
                 pmv->src = src;
                 pmv->dst = dst;
             }
+            else if (auto pmv = std::get_if<AS_ArrayLoad>(&instr))
+            {
+                auto src = tempMap.find(pmv->src) == -1 ? pmv->src : Temp::Label(regNames[color.color[tempMap.get(pmv->src)]]);
+                auto dst = tempMap.find(pmv->dst) == -1 ? pmv->dst : Temp::Label(regNames[color.color[tempMap.get(pmv->dst)]]);
+                pmv->src = src;
+                pmv->dst = dst;
+            }
+            else if (auto pmv = std::get_if<AS_ArrayStore>(&instr))
+            {
+                auto src = tempMap.find(pmv->src) == -1 ? pmv->src : Temp::Label(regNames[color.color[tempMap.get(pmv->src)]]);
+                auto dst = tempMap.find(pmv->dst) == -1 ? pmv->dst : Temp::Label(regNames[color.color[tempMap.get(pmv->dst)]]);
+                pmv->src = src;
+                pmv->dst = dst;
+            }
             else if (auto pcall = std::get_if<AS_Call>(&instr))
             {
                 for (size_t i = 0; i < pcall->args.size(); i++)

@@ -49,6 +49,7 @@ private:
     Half_TypeDecl GetType(const Half_Op& expr);
 
     bool Check(const Half_Var& var);
+    bool Check(const Half_ArrayInit& expr);
     bool Check(const Half_StructInit& expr);
     bool Check(const Half_FuncDecl& func);
     bool Check(const Half_TypeDecl& type);

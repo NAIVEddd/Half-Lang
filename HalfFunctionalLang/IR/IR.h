@@ -24,6 +24,8 @@ struct Half_Ir_Jump;
 struct Half_Ir_Seq;
 struct Half_Ir_Load;
 struct Half_Ir_Store;
+struct Half_Ir_ArrayElemLoad;
+struct Half_Ir_ArrayElemStore;
 struct Half_Ir_Alloc;
 struct Half_Ir_Return;
 struct Half_Ir_Value;
@@ -37,6 +39,8 @@ struct Half_Ir_Exp
         std::shared_ptr<Half_Ir_Const>,
         std::shared_ptr<Half_Ir_Load>,
         std::shared_ptr<Half_Ir_Store>,
+        std::shared_ptr<Half_Ir_ArrayElemLoad>,
+        std::shared_ptr<Half_Ir_ArrayElemStore>,
         std::shared_ptr<Half_Ir_Alloc>,
         std::shared_ptr<Half_Ir_Return>,
         std::shared_ptr<Half_Ir_Function>,
@@ -95,6 +99,26 @@ struct Half_Ir_Store
     Half_Ir_Store(size_t off, Temp::Label l) : data(off), in_label(l) {}
     Half_Ir_Store(Half_Ir_Const c, Temp::Label l) : data(c), in_label(l) {}
     Half_Ir_Store(const Half_Ir_Store& store) : data(store.data), in_label(store.in_label) {}
+};
+
+struct Half_Ir_ArrayElemLoad
+{
+    size_t array_offset;
+    size_t size;    // int is 4, ...
+    Temp::Label index;
+    Temp::Label out_label;
+    Half_Ir_ArrayElemLoad(size_t off, Temp::Label elem_index, size_t sz, Temp::Label l) : array_offset(off), size(sz), index(elem_index), out_label(l) {}
+    Half_Ir_ArrayElemLoad(const Half_Ir_ArrayElemLoad& a) : array_offset(a.array_offset), size(a.size), index(a.index), out_label(a.out_label) {}
+};
+
+struct Half_Ir_ArrayElemStore
+{
+    size_t array_offset;
+    size_t size;    // int is 4, ...
+    Temp::Label index;
+    Temp::Label in_label;
+    Half_Ir_ArrayElemStore(size_t off, Temp::Label elem_index, size_t sz, Temp::Label l) : array_offset(off), size(sz), index(elem_index), in_label(l) {}
+    Half_Ir_ArrayElemStore(const Half_Ir_ArrayElemStore& a) : array_offset(a.array_offset), size(a.size), index(a.index), in_label(a.in_label) {}
 };
 
 struct Half_Ir_Return

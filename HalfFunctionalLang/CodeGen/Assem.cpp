@@ -130,6 +130,22 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         instrs.push_back(AS_Move(l, (*pstore)->in_label));
         return;
     }
+    else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_ArrayElemLoad>>(&exp.exp))
+    {
+        printf("Half_Ir_ArrayElemLoad\n");
+        auto& load = **pload;
+        AS_ArrayLoad as_load(load.out_label, load.index, load.array_offset, load.size);
+        instrs.push_back(as_load);
+        return;
+    }
+    else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_ArrayElemStore>>(&exp.exp))
+    {
+        printf("Half_Ir_ArrayElemStore\n");
+        auto& store = **pstore;
+        AS_ArrayStore as_store(store.index, store.in_label, store.array_offset, store.size);
+        instrs.push_back(as_store);
+        return;
+    }
     else if (auto pop = std::get_if<std::shared_ptr<Half_Ir_LlvmBinOp>>(&exp.exp))
     {
         auto& binop = **pop;
@@ -253,6 +269,20 @@ inline std::string to_string(const AS_Move& mv)
     auto dst = mv.dst.l.starts_with('e') ? "%" + mv.dst.l : mv.dst.l;
     return std::string("movl ") + src + ", " + dst + "\n";
 }
+// movl offset(%rsp, src, 4), dst
+inline std::string to_string(const AS_ArrayLoad& mv)
+{
+    auto src = mv.src.l.starts_with('e') ? "%" + mv.src.l : mv.src.l;
+    auto dst = mv.dst.l.starts_with('e') ? "%" + mv.dst.l : mv.dst.l;
+    return std::string("movl ") + std::to_string(mv.offset) + "(%rsp," + src + ", " + std::to_string(mv.data_size) + "), " + dst + "\n";
+}
+// movl src, offset(%rsp, dst, 4)
+inline std::string to_string(const AS_ArrayStore& mv)
+{
+    auto src = mv.src.l.starts_with('e') ? "%" + mv.src.l : mv.src.l;
+    auto dst = mv.dst.l.starts_with('e') ? "%" + mv.dst.l : mv.dst.l;
+    return std::string("movl ") + src + ", " + std::to_string(mv.offset) + "(%rsp," + dst + ", " + std::to_string(mv.data_size) + ")\n";
+}
 inline std::string to_string(const AS_Jump& jmp)
 {
     return jmp.jump + " " + jmp.target.l + "\n";
@@ -290,6 +320,14 @@ std::string to_string(const AS_Instr& instr)
         return to_string(*pop);
     }
     else if (auto pmv = std::get_if<AS_Move>(&instr))
+    {
+        return to_string(*pmv);
+    }
+    else if (auto pmv = std::get_if<AS_ArrayLoad>(&instr))
+    {
+        return to_string(*pmv);
+    }
+    else if (auto pmv = std::get_if<AS_ArrayStore>(&instr))
     {
         return to_string(*pmv);
     }
