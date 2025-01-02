@@ -62,6 +62,27 @@ struct RegAlloc
                 pmv->src = src;
                 pmv->dst = dst;
             }
+            else if (auto pptr = std::get_if<AS_ElemPtr>(&instr))
+            {
+                auto src = tempMap.find(pptr->elem_ptr) == -1 ? pptr->elem_ptr : Temp::Label(regNames[color.color[tempMap.get(pptr->elem_ptr)]]);
+                auto dst = tempMap.find(pptr->out_label) == -1 ? pptr->out_label : Temp::Label(regNames[color.color[tempMap.get(pptr->out_label)]]);
+                pptr->elem_ptr = src;
+                pptr->out_label = dst;
+            }
+            else if (auto pload = std::get_if<AS_ElemLoad>(&instr))
+            {
+                auto src = tempMap.find(pload->elem_ptr) == -1 ? pload->elem_ptr : Temp::Label(regNames[color.color[tempMap.get(pload->elem_ptr)]]);
+                auto dst = tempMap.find(pload->dst) == -1 ? pload->dst : Temp::Label(regNames[color.color[tempMap.get(pload->dst)]]);
+                pload->elem_ptr = src;
+                pload->dst = dst;
+            }
+            else if (auto pstore = std::get_if<AS_ElemStore>(&instr))
+            {
+                auto src = tempMap.find(pstore->src) == -1 ? pstore->src : Temp::Label(regNames[color.color[tempMap.get(pstore->src)]]);
+                auto ptr = tempMap.find(pstore->elem_ptr) == -1 ? pstore->elem_ptr : Temp::Label(regNames[color.color[tempMap.get(pstore->elem_ptr)]]);
+                pstore->src = src;
+                pstore->elem_ptr = ptr;
+            }
             else if (auto pmv = std::get_if<AS_ArrayLoad>(&instr))
             {
                 auto src = tempMap.find(pmv->src) == -1 ? pmv->src : Temp::Label(regNames[color.color[tempMap.get(pmv->src)]]);

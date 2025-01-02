@@ -57,6 +57,8 @@ ParserResult<Half_Op> pop(ParserInput s);
 
 ParserResult<Half_ArrayInit> parrayinit(ParserInput s);
 
+ParserResult<Half_ArrayNew> parraynew(ParserInput s);
+
 ParserResult<Half_StructInit> pstructinitbody(ParserInput s);
 
 ParserResult<Half_Assign> passign(ParserInput s);

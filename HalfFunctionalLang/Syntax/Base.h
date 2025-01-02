@@ -24,6 +24,7 @@ struct Half_Expr;
 struct Half_Var;
 struct Half_Value;
 struct Half_ArrayInit;
+struct Half_ArrayNew;
 struct Half_StructInit;
 struct Half_Funcall;
 struct Half_Op;
@@ -58,6 +59,7 @@ struct Half_Expr
         std::shared_ptr<Half_Var>,    // rename to VarDecl
         std::shared_ptr<Half_Value>,    // rename to ValueLiteral
         std::shared_ptr<Half_ArrayInit>,
+        std::shared_ptr<Half_ArrayNew>,
         std::shared_ptr<Half_StructInit>,
         std::shared_ptr<Half_Funcall>,
         std::shared_ptr<Half_Op>,
@@ -174,6 +176,14 @@ struct Half_ArrayInit
     Half_ArrayInit() = default;
     Half_ArrayInit(std::string t, std::vector<Half_Expr>& v) : type_name(std::move(t)), values(std::move(v)) {}
     Half_ArrayInit(const Half_ArrayInit& o) : type_name(o.type_name), values(o.values) {}
+};
+
+struct Half_ArrayNew
+{
+    std::string type_name;
+    Half_Expr count;
+    Half_ArrayNew(std::string t, Half_Expr c) : type_name(std::move(t)), count(std::move(c)) {}
+    Half_ArrayNew(const Half_ArrayNew& o) : type_name(o.type_name), count(o.count) {}
 };
 
 struct Half_StructInit
@@ -329,11 +339,11 @@ struct Half_TypeDecl
     // no size, used in rename type
     struct IncompleteArrayType
     {
-        std::string name;
-        IncompleteArrayType(std::string n) : name(std::move(n)) {}
+        std::string type_name;
+        IncompleteArrayType(std::string n) : type_name(std::move(n)) {}
         bool operator==(const IncompleteArrayType& o) const
         {
-            return name == o.name;
+            return type_name == o.type_name;
         }
     };
     struct CompleteArrayType

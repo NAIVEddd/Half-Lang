@@ -35,6 +35,47 @@ struct AS_Move
         : dst(d.name), src(s.name) {}
 };
 
+struct AS_ElemPtr
+{
+    // elem_ptr = elem_ptr + elem_offset
+    size_t elem_offset;
+    Temp::Label elem_ptr;
+    Temp::Label out_label;
+    AS_ElemPtr(size_t off, Temp::Label ptr, Temp::Label l)
+        : elem_offset(off), elem_ptr(ptr), out_label(l) {
+    }
+    AS_ElemPtr(const AS_ElemPtr& a)
+        : elem_offset(a.elem_offset), elem_ptr(a.elem_ptr), out_label(a.out_label) {
+    }
+};
+
+struct AS_ElemLoad
+{
+    // load data from memory
+    //  movl elem_offset(elem_ptr), dst
+    size_t elem_offset;
+    size_t size;
+    Temp::Label elem_ptr;
+    Temp::Label dst;
+    AS_ElemLoad(size_t off, size_t sz, Temp::Label ptr, Temp::Label l)
+        : elem_offset(off), size(sz), elem_ptr(ptr), dst(l) {}
+    AS_ElemLoad(const AS_ElemLoad& a)
+        : elem_offset(a.elem_offset), size(a.size), elem_ptr(a.elem_ptr), dst(a.dst) {}
+};
+
+struct AS_ElemStore
+{
+    // movl src, offset(elem_ptr)
+    size_t elem_offset;
+    size_t size;
+    Temp::Label elem_ptr;
+    Temp::Label src;
+    AS_ElemStore(size_t off, size_t sz, Temp::Label ptr, Temp::Label s)
+        : elem_offset(off), size(sz), elem_ptr(ptr), src(s) {}
+    AS_ElemStore(const AS_ElemStore& o)
+        : elem_offset(o.elem_offset), size(o.size), elem_ptr(o.elem_ptr), src(o.src) {}
+};
+
 // load data from memory
 // movl offset(%rsp, src, 4), dst
 struct AS_ArrayLoad
@@ -120,7 +161,7 @@ struct AS_Return
     AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
-using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
 struct AS_Function
 {

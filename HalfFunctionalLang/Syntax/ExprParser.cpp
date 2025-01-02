@@ -382,8 +382,8 @@ Parser<Half_ArrayInit> GetArrayInitParser()
 			}
 			s = array_elem_name.value().second;
 
-            auto popen = Between(space, space, OneChar('['));
-            auto pclose = Between(space, space, OneChar(']'));
+            auto popen = Between(space, space, String("[["));
+            auto pclose = Between(space, space, String("]]"));
             auto psep = Between(space, space, OneChar(','));
             auto parrayinitbody = SepBy(Between(space, space, pexpr), psep);
             auto pbody = Between(popen, pclose, parrayinitbody);
@@ -402,6 +402,39 @@ ParserResult<Half_ArrayInit> parrayinit(ParserInput s)
     static auto parsearrayinit = GetArrayInitParser();
     auto res = parsearrayinit(s);
 	return res;
+}
+
+Parser<Half_ArrayNew> GetArrayNewParser()
+{
+	return [](ParserInput s) -> ParserResult<Half_ArrayNew>
+		{
+			auto space = Spaces();
+
+			auto type_name = ptypename(s);
+			if (!type_name)
+			{
+				return std::nullopt;
+			}
+			s = type_name.value().second;
+
+			auto popen = Between(space, space, String("[["));
+			auto pclose = Between(space, space, String("]]"));
+			auto pcount = Between(popen, pclose, pexpr);
+            auto count = pcount(s);
+			if (!count)
+			{
+				return std::nullopt;
+			}
+			auto& expr = count.value().first;
+			return std::make_pair(Half_ArrayNew(type_name.value().first, expr), count.value().second);
+		};
+}
+
+ParserResult<Half_ArrayNew> parraynew(ParserInput s)
+{
+    static auto parsearraynew = GetArrayNewParser();
+    auto res = parsearraynew(s);
+    return res;
 }
 
 Parser<Half_StructInit> GetStructInitParser()
@@ -1314,11 +1347,12 @@ Parser<Half_Expr> GetExprParser()
             auto typeparser = PipeExpr(ptypedecl);
             auto structinitparser = PipeExpr(pstructinitbody);
             auto arrayinitparser = PipeExpr(parrayinit);
+            auto arraynewparser = PipeExpr(parraynew);
 
 			auto c = Choice(std::vector{
 				fundefparser, typeparser,
 				letparser, assignparser, ifparser, forparser, whileparser,
-                opparser, structinitparser, arrayinitparser,
+                opparser, structinitparser, arrayinitparser, arraynewparser,
 				funcallparser, varparser, valueparser, });
 			auto r = c(s);
 			if (!r)

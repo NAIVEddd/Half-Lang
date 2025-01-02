@@ -159,6 +159,11 @@ bool TypeCheck::Check(const Half_ArrayInit& expr)
     return false;
 }
 
+bool TypeCheck::Check(const Half_ArrayNew& expr)
+{
+    return false;
+}
+
 bool TypeCheck::Check(const Half_StructInit& expr)
 {
     return false;

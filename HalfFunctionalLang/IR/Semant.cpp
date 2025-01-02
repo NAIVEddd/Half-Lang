@@ -97,6 +97,17 @@ std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_T
         {
         }
     }
+    else if (auto ptype = std::get_if<Half_TypeDecl::IncompleteArrayType>(&type.type))
+    {
+        auto opt_ty = table->findType(ptype->type_name);
+        if (!opt_ty)
+        {
+            printf("Type not found: %s\n", ptype->type_name.c_str());
+            _ASSERT(false);
+        }
+        auto arr = Half_Type_Info::ArrayType(opt_ty.value(), 0);
+        return std::make_shared<Half_Type_Info>(arr);
+    }
     else if (auto ptype = std::get_if<Half_TypeDecl::ArrayType>(&type.type))
     {
         auto opt_ty = table->findType(ptype->type_name);
@@ -156,6 +167,51 @@ std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_T
         return std::make_shared<Half_Type_Info>(func);
     }
     return nullptr;
+}
+
+Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_Var& var, Builder& builder)
+{
+    auto symbol = table->find(var.name());
+    if (!symbol)
+    {
+        _ASSERT(false);
+    }
+    if (auto pfield = std::get_if<Half_Var::FieldVar>(&var.var))
+    {
+        auto& field = *pfield;
+        auto offset = symbol.value().offset;
+        auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&symbol.value().type.type);
+        _ASSERT(pstruct_ty);
+        auto base_offset = Access_Var_Offset(table, *field.var, symbol->type);
+        auto& struct_ty = *pstruct_ty;
+        auto& struct_field = struct_ty.GetField(field.id);
+        auto field_offset = struct_field.offset;
+        Half_Ir_GetElementPtr gep(field_offset + base_offset);
+        //builder.AddExp(gep);
+        return gep;
+    }
+    else if (auto parray = std::get_if<Half_Var::SubscriptVar>(&var.var))
+    {
+        auto& array = *parray;
+        auto base_offset = Access_Var_Offset(table, var, symbol->type);
+        Builder new_builder;
+        auto idx = Trans_Expr(table, new_builder, *array.index);
+        auto sz = 0;
+        if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
+        {
+            _ASSERT(parray_ty);
+            sz = parray_ty->type->GetSize();
+        }
+        _ASSERT(new_builder.blocks[0].exps.size() == 1);
+        Half_Ir_GetElementPtr gep(base_offset);
+        gep.elem_sizes.push_back(sz);
+        gep.in_index.push_back(new_builder.blocks[0].exps[0]);
+        gep.exp_out_labels.push_back(idx.name);
+        return gep;
+    }
+    auto base_offset = symbol.value().offset;
+    Half_Ir_GetElementPtr gep(base_offset);
+    return gep;
 }
 
 Half_Ir_Name Trans_Var_Builder(std::shared_ptr<Table>& table, Half_Var& var, Builder& builder)
@@ -418,20 +474,29 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
                 _ASSERT(false);
                 return Half_Ir_Name("Varabile not defined:(" + assign.left.name() + ")");
             }
+            /*auto left_ptr = Trans_LeftVar_Builder(table, assign.left, builder);
+            auto base_offset = left_ptr.GetOffset();
+            if (base_offset == -1)
+            {
+                builder.AddExp(left_ptr);
+            }*/
             if (auto pstruct = std::get_if<Half_Type_Info::StructType>(&pty.value()->type))
             {
                 auto& struct_ty = *pstruct;
+                auto left = Trans_Var_Builder(table, assign.left, builder);
                 for (size_t i = 0; i < structinit.fields.size(); i++)
                 {
                     auto& init_field = structinit.fields[i];
                     auto& ty_field = init_field.name.empty()? struct_ty.field_list[i] : struct_ty.GetField(init_field.name);
                     // TODO: recursive call to translate the field
                     // for now, only support simple type(first level of struct must be simple type)
-                    auto offset = symbol.value().offset + ty_field.offset;
 
-                    auto rval = Trans_Expr(table, builder, init_field.value);
-                    auto store = Half_Ir_Store(offset, rval.name);
-                    builder.AddExp(store);
+                    Half_Assign init;
+                    auto t_v = std::make_shared<Half_Var>(assign.left);
+                    init.left = Half_Var::FieldVar(t_v, ty_field.name);
+                    init.right = init_field.value;
+                    auto init_exp = Half_Expr(init);
+                    Trans_Expr(table, builder, init_exp);
                 }
                 return Half_Ir_Name("StructInit, should't use this label " + structinit.type_name);
             }
@@ -462,14 +527,20 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
                 auto array_offset = symbol.value().offset;
                 auto elem_size = array_ty.type->GetSize();
 
+                // TODO: use left var builder to get the array address
                 for (size_t i = 0; i < arrayinit.values.size(); i++)
                 {
                     auto ci = Half_Ir_Const(i);
 
-                    builder.AddExp(ci);
-                    auto n = Trans_Expr(table, builder, arrayinit.values[i]);
-                    Half_Ir_ArrayElemStore store(array_offset, ci.out_label, elem_size, n.name);
-                    builder.AddExp(store);
+                    Half_Assign init;
+                    Half_Var l_var;
+                    auto t_v = std::make_shared<Half_Var>(assign.left);
+                    auto idx = std::make_shared<Half_Expr>(Half_Value((int)i));
+                    l_var = Half_Var::SubscriptVar(t_v, idx);
+                    init.left = l_var;
+                    init.right = arrayinit.values[i];
+                    auto init_exp = Half_Expr(init);
+                    Trans_Expr(table, builder, init_exp);
                 }
                 return Half_Ir_Name("ArrayInit, should't use this label " + arrayinit.type_name);
             }
@@ -487,8 +558,24 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
             _ASSERT(false);
             return Half_Ir_Name("Varabile not defined:(" + assign.left.name() + ")");
         }
-        auto store = Half_Ir_Store(symbol.value().offset, rval.name);
-        builder.AddExp(store);
+
+        // left value is a simple type, store the value directly
+        // if left value is pointer, get the address of right value and store it to the left value
+
+        auto left_ptr = Trans_LeftVar_Builder(table, assign.left, builder);
+        auto base_offset = left_ptr.GetOffset();
+        if (base_offset != -1)
+        {
+            auto store = Half_Ir_Store(base_offset, rval.name);
+            builder.AddExp(store);
+        }
+        else
+        {
+            builder.AddExp(left_ptr);
+            auto store = Half_Ir_ElemStore(0, symbol.value().type.GetSize(), left_ptr.out_label, rval.name);
+            builder.AddExp(store);
+        }
+        
         return rval.name;
     }
     else if (auto pfuncall = std::get_if<std::shared_ptr<Half_Funcall>>(&expr.expr))

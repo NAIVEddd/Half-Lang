@@ -26,6 +26,9 @@ struct Half_Ir_Load;
 struct Half_Ir_Store;
 struct Half_Ir_ArrayElemLoad;
 struct Half_Ir_ArrayElemStore;
+struct Half_Ir_ElemLoad;
+struct Half_Ir_ElemStore;
+struct Half_Ir_GetElementPtr;
 struct Half_Ir_Alloc;
 struct Half_Ir_Return;
 struct Half_Ir_Value;
@@ -41,6 +44,9 @@ struct Half_Ir_Exp
         std::shared_ptr<Half_Ir_Store>,
         std::shared_ptr<Half_Ir_ArrayElemLoad>,
         std::shared_ptr<Half_Ir_ArrayElemStore>,
+        std::shared_ptr<Half_Ir_ElemLoad>,
+        std::shared_ptr<Half_Ir_ElemStore>,
+        std::shared_ptr<Half_Ir_GetElementPtr>,
         std::shared_ptr<Half_Ir_Alloc>,
         std::shared_ptr<Half_Ir_Return>,
         std::shared_ptr<Half_Ir_Function>,
@@ -101,6 +107,34 @@ struct Half_Ir_Store
     Half_Ir_Store(const Half_Ir_Store& store) : data(store.data), in_label(store.in_label) {}
 };
 
+struct Half_Ir_ElemLoad
+{
+    // load data from memory
+    //  elem_offset(elem_ptr) = elem_ptr + elem_offset (read 4 or 8 bytes from memory)
+    size_t elem_offset;
+    size_t size;    // int is 4, ...
+    Temp::Label elem_ptr;
+    Temp::Label out_label;
+    Half_Ir_ElemLoad(size_t off, size_t sz, Temp::Label ptr, Temp::Label l)
+        : elem_offset(off), size(sz), elem_ptr(ptr), out_label(l) {}
+    Half_Ir_ElemLoad(const Half_Ir_ElemLoad& a)
+        : elem_offset(a.elem_offset), size(a.size), elem_ptr(a.elem_ptr), out_label(a.out_label) {}
+};
+
+struct Half_Ir_ElemStore
+{
+    // store data to memory
+    //   elem_offset(elem_ptr) = elem_ptr + elem_offset (write 4 or 8 bytes to memory)
+    size_t elem_offset;
+    size_t size;    // int is 4, ...
+    Temp::Label elem_ptr;
+    Temp::Label in_label;
+    Half_Ir_ElemStore(size_t off, size_t sz, Temp::Label ptr, Temp::Label l)
+        : elem_offset(off), size(sz), elem_ptr(ptr), in_label(l) {}
+    Half_Ir_ElemStore(const Half_Ir_ElemStore& a)
+        : elem_offset(a.elem_offset), size(a.size), elem_ptr(a.elem_ptr), in_label(a.in_label) {}
+};
+
 struct Half_Ir_ArrayElemLoad
 {
     size_t array_offset;
@@ -119,6 +153,58 @@ struct Half_Ir_ArrayElemStore
     Temp::Label in_label;
     Half_Ir_ArrayElemStore(size_t off, Temp::Label elem_index, size_t sz, Temp::Label l) : array_offset(off), size(sz), index(elem_index), in_label(l) {}
     Half_Ir_ArrayElemStore(const Half_Ir_ArrayElemStore& a) : array_offset(a.array_offset), size(a.size), index(a.index), in_label(a.in_label) {}
+};
+
+struct Half_Ir_GetElementPtr
+{
+    size_t offset = 0;
+    std::vector<size_t> elem_sizes;
+    std::vector<Half_Ir_Exp> in_index;
+    std::vector<Temp::Label> exp_out_labels;
+    Temp::Label out_label;
+    Half_Ir_GetElementPtr(Temp::Label l = Temp::NewLabel())
+        : out_label(l) {}
+    Half_Ir_GetElementPtr(size_t off, Temp::Label l = Temp::NewLabel())
+        : offset(off), out_label(l) {}
+    Half_Ir_GetElementPtr(size_t off, std::vector<size_t> szs, std::vector<Half_Ir_Exp> ls, Temp::Label out = Temp::NewLabel())
+        : offset(off), elem_sizes(szs), in_index(ls), out_label(out) {}
+    Half_Ir_GetElementPtr(const Half_Ir_GetElementPtr& g)
+        : offset(g.offset), elem_sizes(g.elem_sizes)
+        , in_index(g.in_index), exp_out_labels(g.exp_out_labels), out_label(g.out_label) {};
+    
+    size_t GetOffset() const
+    {
+        _ASSERT(elem_sizes.size() == in_index.size());
+        if (!is_const_offset())
+        {
+            return -1;
+        }
+        size_t sz = offset;
+        for (size_t i = 0; i < elem_sizes.size(); i++)
+        {
+            if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&in_index[i].exp))
+            {
+                sz += elem_sizes[i] * (*pconst)->n;
+            }
+        }
+        return sz;
+    }
+    bool is_const_offset() const
+    {
+        if (in_index.empty())
+        {
+            return true;
+        }
+        for (size_t i = 0; i < in_index.size(); i++)
+        {
+            if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&in_index[i].exp))
+            {
+                continue;
+            }
+            return false;
+        }
+        return true;
+    }
 };
 
 struct Half_Ir_Return

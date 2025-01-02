@@ -794,6 +794,18 @@ void test_expr_parser()
         _ASSERT(t1.value().second.empty());
     }
 
+    // test array init
+    {
+        std::string prog = "int3 [[1, 2, 3]]";
+        auto t1 = parrayinit(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+
+        std::string prog2 = "a[0] + a[1]";
+        auto t2 = pop(prog2);
+        _ASSERT(t2);
+    }
+
     {
         std::string prog = "type list = {first:int, rest:list}";
         auto t1 = ptypedecl(prog);
@@ -803,6 +815,12 @@ void test_expr_parser()
     {
         std::string prog = "type list = array of int[10]";
         auto t1 = ptypedecl(prog);
+        _ASSERT(t1);
+        _ASSERT(t1.value().second.empty());
+    }
+    {
+        std::string prog = "ints [[x]]";
+        auto t1 = parraynew(prog);
         _ASSERT(t1);
         _ASSERT(t1.value().second.empty());
     }
@@ -1001,6 +1019,71 @@ function main() : int =
     let p1 = point3 {x=1, y=2, z=3}
     let p2 = point3 { 3, 4, 5 }
     p1.x + p1.y + p1.z + p2.x + p2.y + p2.z
+end)";
+
+    // test array type
+    std::string prog9 =
+        R"(
+type dyn_arr = array of int
+type int10 = array of int[10]
+function main() : int =
+    let a = int10 [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]
+    a[1] = 3
+    a[0] + a[1]
+end)";
+
+    std::string prog10 =
+        R"(
+type point = 
+    {
+        x:int,
+        y:int,
+        z:int,
+        w:int
+    }
+type p10 = array of point
+function main() : int =
+    let ps = point{1,2,3,4}
+    ps.z = 6
+    0
+end)";
+
+    std::string prog11 =
+        R"(
+type int_array = array of int
+
+function swap(arr int_array, i int, j int) : int =
+    let t = arr[i]
+    arr[i] = arr[j]
+    arr[j] = t
+    0
+end
+
+function sort(arr int_array, low int, high int) : int =
+    if low >= high then
+        0
+    else
+        let i = low
+        let j = high
+        let base = arr[i]
+        while i < j do
+            while i < j && arr[j] >= base do
+                j = j - 1
+            end
+            swap(arr, i, j)
+            while i < j && arr[i] <= base do
+                i = i + 1
+            end
+            swap(arr, i, j)
+        end
+        sort(arr, low, i)
+        sort(arr, i + 1, high)
+    end
+end
+type int_10 = array of int[11]
+function main() : int =
+    let arr = int_10 [[3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 7]]
+    sort(arr, 0, 10)
 end)";
 
     /* {
@@ -1293,10 +1376,50 @@ end)";
                 printf("%s", to_string(g.instrs[i]).c_str());
             }
         }*/
-        {   // test for code gen
+        /*{   // test for code gen
             Builder b;
             auto check = TypeCheck();
             auto e = pprogram(prog8);
+            if (check.Check(e.value().first))
+            {
+                printf("TypeCheck success\n");
+            }
+            std::vector<AS_Instr> instrs;
+
+            auto ir_name = Trans_Expr(e.value().first, b);
+            printf("\n%s\n", to_string(ir_name.name).c_str());
+
+            MunchExps_llvmlike(b, instrs);
+
+            printf("\nCount %zd\n", instrs.size());
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                printf("%s", to_string(instrs[i]).c_str());
+            }
+            auto g = Graph();
+            g.initialize(instrs);
+            auto live = Liveness();
+            live.initialize(g);
+            printf("\nCount %zd\n", g.Nodes.size());
+            auto rlive = Liveness();
+            rlive.rinitialize(g);
+            live == rlive;
+            Color color(8);
+            color.initialize(live);
+            color.allocate();
+            color.print();
+            RegAlloc regalloc;
+            regalloc.allocate(g, live);
+            for (size_t i = 0; i < g.instrs.size(); i++)
+            {
+                printf("%s", to_string(g.instrs[i]).c_str());
+            }
+        }*/
+        {   // test for code gen
+            Builder b;
+            auto check = TypeCheck();
+            auto e = pprogram(prog11);
+            _ASSERT(e.value().second.empty());
             if (check.Check(e.value().first))
             {
                 printf("TypeCheck success\n");

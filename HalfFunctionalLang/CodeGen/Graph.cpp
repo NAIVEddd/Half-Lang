@@ -44,6 +44,17 @@ std::vector<Temp::Label> Node::Def() const
     {
         labels.push_back(pmv->dst);
     }
+    else if (auto pptr = std::get_if<AS_ElemPtr>(&info))
+    {
+        labels.push_back(pptr->out_label);
+    }
+    else if (auto pload = std::get_if<AS_ElemLoad>(&info))
+    {
+        labels.push_back(pmv->dst);
+    }
+    else if (auto pstore = std::get_if<AS_ElemStore>(&info))
+    {
+    }
     else if (auto pmv = std::get_if<AS_ArrayLoad>(&info))
     {
         labels.push_back(pmv->dst);
@@ -81,6 +92,19 @@ std::vector<Temp::Label> Node::Use() const
     else if (auto pmv = std::get_if<AS_Move>(&info))
     {
         labels.push_back(pmv->src);
+    }
+    else if (auto pptr = std::get_if<AS_ElemPtr>(&info))
+    {
+        labels.push_back(pptr->elem_ptr);
+    }
+    else if (auto pload = std::get_if<AS_ElemLoad>(&info))
+    {
+        labels.push_back(pload->elem_ptr);
+    }
+    else if (auto pstore = std::get_if<AS_ElemStore>(&info))
+    {
+        labels.push_back(pstore->elem_ptr);
+        labels.push_back(pstore->src);
     }
     else if (auto pmv = std::get_if<AS_ArrayLoad>(&info))
     {
