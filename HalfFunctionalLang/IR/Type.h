@@ -4,6 +4,17 @@
 #include <vector>
 #include <variant>
 
+enum class Half_TypeID
+{
+    Basic,
+    Pointer,
+    Tuple,
+    Rename,
+    Array,
+    Struct,
+    Func
+};
+
 struct Half_Type_Info
 {
     struct BasicType

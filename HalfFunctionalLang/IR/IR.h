@@ -3,6 +3,7 @@
 #include"../Syntax/Base.h"
 #include"Temp.h"
 #include"BasicBlock.h"
+#include"Type.h"
 #include<map>
 
 //struct Half_Ir;
@@ -35,10 +36,45 @@ struct Half_Ir_Value;
 struct Half_Ir_Function;
 struct Half_Ir_Phi;
 
+struct Alloca;
+struct Load;
+struct Store;
+
+struct Half_Ir_Instruction
+{
+    using Type = std::variant<
+        std::monostate,
+        std::shared_ptr<Half_Ir_Const>,
+        std::shared_ptr<Half_Ir_Load>,
+        std::shared_ptr<Half_Ir_Store>,
+        std::shared_ptr<Half_Ir_GetElementPtr>,
+        std::shared_ptr<Half_Ir_Alloc>,
+        std::shared_ptr<Half_Ir_Return>,
+        std::shared_ptr<Half_Ir_Function>,
+        std::shared_ptr<Half_Ir_Value>,
+        std::shared_ptr<Half_Ir_Call>,
+        std::shared_ptr<Half_Ir_LlvmBinOp>,
+        std::shared_ptr<Half_Ir_LlvmBranch>,
+        std::shared_ptr<Half_Ir_Move>,
+        std::shared_ptr<Half_Ir_Label>,
+        std::shared_ptr<Half_Ir_Phi>,
+        std::shared_ptr<Half_Ir_Jump>
+    >;
+    Type inst;
+
+    Half_Ir_Instruction() = default;
+    template<typename T>
+    Half_Ir_Instruction(T t) : inst(std::make_shared<T>(t)) {}
+    Half_Ir_Instruction(const Half_Ir_Instruction& o) : inst(o.inst) {}
+};
+
 struct Half_Ir_Exp
 {
     using Type = std::variant<
         std::monostate,
+        std::shared_ptr<Alloca>,
+        std::shared_ptr<Load>,
+        std::shared_ptr<Store>,
         std::shared_ptr<Half_Ir_Const>,
         std::shared_ptr<Half_Ir_Load>,
         std::shared_ptr<Half_Ir_Store>,
@@ -71,12 +107,106 @@ struct Half_Ir_Exp
     Half_Ir_Exp(const Half_Ir_Exp& o) : exp(o.exp) {}
 };
 
+
+// default address of value is offset(rsp)  start from bottom of the stack
+// load value from memory to register
+
+enum class Half_AddressSpace
+{
+    StackTop,
+    StackBottom,
+};
+
+struct Address
+{   // format as offset(base)
+    Half_Type_Info type;
+    Temp::Label base;
+    size_t offset;
+};
+struct Register
+{
+    Half_Type_Info type;
+    Temp::Label reg;
+};
+// Value = Address | Register
+struct Value
+{
+    // get label
+    Temp::Label GetLabel() const
+    {
+        if (std::holds_alternative<Address>(value))
+        {
+            return std::get<Address>(value).base;
+        }
+        else if (std::holds_alternative<Register>(value))
+        {
+            return std::get<Register>(value).reg;
+        }
+        return Temp::Label("Invalid Value Label");
+    }
+
+    std::variant<Address, Register> value;
+    Value(Address a) : value(a) {}
+    Value(Register r) : value(r) {}
+};
+
+// TODO: alloca from bottom of the stack(offset is positive)
+//               or top of the stack(offset is negative)
+struct Alloca
+{
+    Address out_address;
+    Alloca(Address a) : out_address(a) {}
+    Value GetResult() const
+    {
+        return Value(out_address);
+    }
+};
+
+// alloca return a address
+// format address to offset(rsp)
+// so load become Mov offset(rsp), out_label
+struct Load
+{
+    Address address;
+    Register out_register;
+    Load(Address a) : address(a), out_register(Register{ a.type, Temp::NewLabel() }) {}
+    Load(Address a, Register r) : address(a), out_register(r) {}
+    Value GetResult() const
+    {
+        return Value(out_register);
+    }
+};
+
+// store value to memory
+struct Store
+{
+    Value value;
+    Address address;
+    Store(Value v, Address a) : value(v), address(a) {}
+};
+
+// struct Half_Ir_GetElementPtr
+// {
+//     Type PointeeType;
+
+//     // Value is Address
+//     Value Ptr;
+//     // Value is const(index)|pointer(to index)
+//     std::vector<Value> index;
+//     // Value is Address
+//     Value OutValue;
+// };
+
 struct Half_Ir_Const
 {
     int n;
     Temp::Label out_label;
     Half_Ir_Const(int x, Temp::Label l = Temp::NewLabel()) : n(x), out_label(l) {}
     Half_Ir_Const(const Half_Ir_Const& c) : n(c.n), out_label(c.out_label) {}
+    Value GetResult() const
+    {
+        return Value(Register{Half_Type_Info::BasicType::BasicT::Int, out_label});
+    }
 };
 
 struct Half_Ir_Alloc
@@ -172,6 +302,11 @@ struct Half_Ir_GetElementPtr
         : offset(g.offset), elem_sizes(g.elem_sizes)
         , in_index(g.in_index), exp_out_labels(g.exp_out_labels), out_label(g.out_label) {};
     
+    Address GetResult() const
+    {
+        return Address{ Half_Type_Info::BasicType::BasicT::Int, out_label, offset };
+    }
+
     size_t GetOffset() const
     {
         _ASSERT(elem_sizes.size() == in_index.size());
