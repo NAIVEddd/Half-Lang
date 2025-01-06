@@ -21,6 +21,7 @@ struct Half_Type_Info
     {
         enum class BasicT
         {
+            Invalid,
             Char,
             Int,
             Float,
@@ -33,6 +34,7 @@ struct Half_Type_Info
     };
     struct PointerType
     {
+        PointerType(const Half_Type_Info& t) : type(std::make_shared<Half_Type_Info>(t)) {}
         PointerType(std::shared_ptr<Half_Type_Info> t) : type(std::move(t)) {}
         std::shared_ptr<Half_Type_Info> type;
     };
@@ -65,7 +67,9 @@ struct Half_Type_Info
             TypePair(const TypePair& o) : name(o.name), type(o.type), offset(o.offset) {}
         };
         StructType(std::string n, std::vector<TypePair> f) : name(n), field_list(f) {}
+        TypePair& GetField(size_t index);
         TypePair& GetField(std::string name);
+        size_t GetFieldIndex(std::string name);
 
         std::string name;
         std::vector<TypePair> field_list;

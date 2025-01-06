@@ -124,17 +124,17 @@ struct AS_Jump
     {
         switch (op)
         {
-        case Half_Ir_LlvmBinOp::Oper::Less:
+        case Half_Ir_BinOp::Oper::Less:
             return "jl";
-        case Half_Ir_LlvmBinOp::Oper::LessEqual:
+        case Half_Ir_BinOp::Oper::LessEqual:
             return "jle";
-        case Half_Ir_LlvmBinOp::Oper::Greater:
+        case Half_Ir_BinOp::Oper::Greater:
             return "jg";
-        case Half_Ir_LlvmBinOp::Oper::GreaterEqual:
+        case Half_Ir_BinOp::Oper::GreaterEqual:
             return "jge";
-        case Half_Ir_LlvmBinOp::Oper::Equal:
+        case Half_Ir_BinOp::Oper::Equal:
             return "je";
-        case Half_Ir_LlvmBinOp::Oper::NotEqual:
+        case Half_Ir_BinOp::Oper::NotEqual:
             return "jne";
         default:
             break;

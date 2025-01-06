@@ -169,6 +169,77 @@ std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_T
     return nullptr;
 }
 
+Address Trans_GetElementPtr(std::shared_ptr<Table>& table, Half_Ir_GetElementPtr& ptr, Builder& builder)
+{
+    Half_Type_Info type = ptr.source_element_type;
+    for (size_t i = 0; i < ptr.in_indexs.size(); i++)
+    {
+        auto& idx = ptr.in_indexs[i];
+
+        // check if it is a pointer
+        if (auto pptr_ty = std::get_if<Half_Type_Info::PointerType>(&type.type))
+        {
+            if (auto pconst = std::get_if<Half_Ir_Const>(&idx))
+            {
+                auto n = pconst->n;
+                auto sz = type.GetSize();
+                ptr.offset += n * sz;
+            }
+            else if (auto pvar = std::get_if<Value>(&idx))
+            {
+                auto sz = (int)type.GetSize();
+                Half_Ir_Const ty_sz(sz);
+                Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, ty_sz.GetResult().GetLabel(), pvar->GetLabel(), Temp::NewLabel());
+                // bug, should use 'leaq offset(base), out'
+                Half_Ir_Const offset((int)ptr.offset);
+                Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, binop.GetResult().GetLabel(), offset.GetResult().GetLabel(), Temp::NewLabel());
+                builder.AddExp(ty_sz);
+                builder.AddExp(binop);
+                builder.AddExp(offset);
+                builder.AddExp(binop2);
+                ptr.base = binop2.GetResult().GetLabel();
+                ptr.offset = 0;
+            }
+
+            auto& ptr_ty = *pptr_ty;
+            type = *ptr_ty.type;
+        }
+        else if (auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&type.type))
+        {
+            auto& struct_ty = *pstruct_ty;
+            auto index = std::get<Half_Ir_Const>(idx);
+            auto field = struct_ty.GetField(index.n);
+            auto offset = field.offset;
+            ptr.offset += offset;
+
+            type = *field.type;
+        }
+        else if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&type.type))
+        {
+            _ASSERT(std::holds_alternative<Value>(idx));
+            auto sz = (int)parray_ty->type->GetSize();
+            if (auto pvar = std::get_if<Value>(&idx))
+            {
+                Half_Ir_Const ty_sz(sz);
+                Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, ty_sz.GetResult().GetLabel(), pvar->GetLabel(), Temp::NewLabel());
+                // bug: should use ' leaq offset(base), out_label'
+                Half_Ir_Const offset((int)ptr.offset);
+                Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, binop.GetResult().GetLabel(), offset.GetResult().GetLabel(), Temp::NewLabel());
+                builder.AddExp(ty_sz);
+                builder.AddExp(binop);
+                builder.AddExp(offset);
+                builder.AddExp(binop2);
+                ptr.base = binop2.GetResult().GetLabel();
+                ptr.offset = 0;
+            }
+
+            auto& array_ty = *parray_ty;
+            type = *array_ty.type;
+        }
+    }
+    return Address{type, ptr.base, ptr.offset};
+}
+
 Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_Var& var, Builder& builder)
 {
     auto symbol = table->find(var.name());
@@ -176,42 +247,61 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
     {
         _ASSERT(false);
     }
-    if (auto pfield = std::get_if<Half_Var::FieldVar>(&var.var))
+    if (auto psimple = std::get_if<Half_Var::SimpleVar>(&var.var))
+    {
+        auto offset = symbol.value().offset;
+        Half_Ir_GetElementPtr gep(symbol.value().addr);
+        gep.in_indexs.push_back(Half_Ir_Const(0));
+        gep.result_element_type = symbol.value().type;
+        return gep;
+    }
+    else if (auto pfield = std::get_if<Half_Var::FieldVar>(&var.var))
     {
         auto& field = *pfield;
-        auto offset = symbol.value().offset;
-        auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&symbol.value().type.type);
-        _ASSERT(pstruct_ty);
-        auto base_offset = Access_Var_Offset(table, *field.var, symbol->type);
-        auto& struct_ty = *pstruct_ty;
-        auto& struct_field = struct_ty.GetField(field.id);
-        auto field_offset = struct_field.offset;
-        Half_Ir_GetElementPtr gep(field_offset + base_offset);
-        //builder.AddExp(gep);
-        return gep;
+        Half_Ir_GetElementPtr get_ptr = Trans_LeftVar_Builder(table, *field.var, builder);
+        /*if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
+        {
+            get_ptr = Half_Ir_GetElementPtr(symbol.value().addr);
+        }
+        else
+        {
+            get_ptr = Trans_LeftVar_Builder(table, *field.var, builder);
+        }*/
+
+        if (auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&symbol.value().type.type))
+        {
+            auto& struct_ty = *pstruct_ty;
+            get_ptr.in_indexs.push_back(Half_Ir_Const((int)struct_ty.GetFieldIndex(field.id)));
+            get_ptr.result_element_type = struct_ty.GetField(field.id).type;
+            return get_ptr;
+        }
+        get_ptr.result_element_type = Half_Type_Info::BasicType::BasicT::Invalid;
+        return get_ptr;
     }
     else if (auto parray = std::get_if<Half_Var::SubscriptVar>(&var.var))
     {
         auto& array = *parray;
-        auto base_offset = Access_Var_Offset(table, var, symbol->type);
-        Builder new_builder;
-        auto idx = Trans_Expr(table, new_builder, *array.index);
-        auto sz = 0;
+        Half_Ir_GetElementPtr get_ptr = Trans_LeftVar_Builder(table, *array.var, builder);
+        /*if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
+        {
+            get_ptr = Half_Ir_GetElementPtr(symbol.value().addr);
+        }
+        else
+        {
+            get_ptr = Trans_LeftVar_Builder(table, *array.var, builder);
+        }*/
+        auto idx = Trans_Expr(table, builder, *array.index, 0);
+        get_ptr.in_indexs.push_back(idx);
         if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
         {
-            _ASSERT(parray_ty);
-            sz = parray_ty->type->GetSize();
+            get_ptr.result_element_type = parray_ty->type;
+            return get_ptr;
         }
-        _ASSERT(new_builder.blocks[0].exps.size() == 1);
-        Half_Ir_GetElementPtr gep(base_offset);
-        gep.elem_sizes.push_back(sz);
-        gep.in_index.push_back(new_builder.blocks[0].exps[0]);
-        gep.exp_out_labels.push_back(idx.name);
-        return gep;
+        get_ptr.result_element_type = Half_Type_Info::BasicType::BasicT::Invalid;
+        return get_ptr;
     }
-    auto base_offset = symbol.value().offset;
-    Half_Ir_GetElementPtr gep(base_offset);
-    return gep;
+    _ASSERT(false);
+    return Half_Ir_GetElementPtr(Address{});
 }
 
 Half_Ir_Name Trans_Var_Builder(std::shared_ptr<Table>& table, Half_Var& var, Builder& builder)
@@ -226,7 +316,7 @@ Half_Ir_Name Trans_Var_Builder(std::shared_ptr<Table>& table, Half_Var& var, Bui
     {
         auto& array = *parray;
         auto offset = symbol.value().offset;
-        auto i = Trans_Expr(table, builder, *array.index);
+        auto i = Trans_Expr(table, builder, *array.index, 0);
         
         auto sz = 0;
         if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
@@ -234,36 +324,43 @@ Half_Ir_Name Trans_Var_Builder(std::shared_ptr<Table>& table, Half_Var& var, Bui
             _ASSERT(parray_ty);
             sz = parray_ty->type->GetSize();
         }
-        Half_Ir_ArrayElemLoad load(offset, i.name, sz, Temp::NewLabel());
-        builder.AddExp(load);
-        return load.out_label;
+        //Half_Ir_ArrayElemLoad load(offset, i.name, sz, Temp::NewLabel());
+        //builder.AddExp(load);
+        //return load.out_label;
+        return {};
     }
-    auto offset = Access_Var_Offset(table, var, symbol->type);
-    auto load = Half_Ir_Load(symbol->offset + offset, Temp::NewLabel());
-    builder.AddExp(load);
-    return load.out_label;
+    //auto offset = Access_Var_Offset(table, var, symbol->type);
+    //auto load = Half_Ir_Load_deprecated(symbol->offset + offset, Temp::NewLabel());
+    //builder.AddExp(load);
+    //return load.out_label;
+    return {};
 }
 
+Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Var& var, int);
+Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Value& value, int);
+Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Funcall& funcall, int);
 Half_Ir_Name Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builder& builder);
 Half_Ir_Name Trans_OpExpr_Builder(std::shared_ptr<Table>& table, Half_Op::Half_OpExpr& op, Builder& builder)
 {
     if (auto pvar = std::get_if<Half_Var>(&op))
     {
         auto& var = *pvar;
-        return Trans_Var_Builder(table, var, builder);
+        auto addr = Trans_Expr(table, builder, var, 0);
+        return addr.GetLabel();
+        //return Trans_Var_Builder(table, var, builder);
     }
     else if (auto pvalue = std::get_if<Half_Value>(&op))
     {
         auto& value = *pvalue;
-        auto value_expr = Half_Expr(value);
-        return Trans_Expr(table, builder, value_expr);
+        auto res = Trans_Expr(table, builder, value, 0);
+        return res.GetLabel();
         //return Trans_Value_Builder(table, value, builder);
     }
     else if (auto pfuncall = std::get_if<Half_Funcall>(&op))
     {
         auto& funcall = *pfuncall;
-        auto funcall_expr = Half_Expr(funcall);
-        return Trans_Expr(table, builder, funcall_expr);
+        auto res = Trans_Expr(table, builder, funcall, 0);
+        return res.GetLabel();
         //return Trans_Funcall_Builder(table, funcall, builder);
     }
     else if (auto pop = std::get_if<Half_Op>(&op))
@@ -281,7 +378,7 @@ Half_Ir_Name Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builde
     auto l = Trans_OpExpr_Builder(table, *op.left, builder);
     auto r = Trans_OpExpr_Builder(table, *op.right, builder);
 
-    auto op_ir = Half_Ir_LlvmBinOp(op.op, l, r, Temp::NewLabel());
+    auto op_ir = Half_Ir_BinOp(op.op, l, r, Temp::NewLabel());
     builder.AddExp(op_ir);
 
     return op_ir.out_label;
@@ -301,19 +398,22 @@ Half_Ir_Name Trans_CondOp(std::shared_ptr<Table>& table, Builder& builder, Half_
     {
         auto& var = *pvar;
         auto tmp = Half_Expr(var);
-        return Trans_Expr(table, builder, tmp);
+        auto res = Trans_Expr(table, builder, tmp, 0);
+        return res.GetLabel();
     }
     else if (auto pvalue = std::get_if<Half_Value>(&op))
     {
         auto& value = *pvalue;
         auto tmp = Half_Expr(value);
-        return Trans_Expr(table, builder, tmp);
+        auto res = Trans_Expr(table, builder, tmp, 0);
+        return res.GetLabel();
     }
     else if (auto pfuncall = std::get_if<Half_Funcall>(&op))
     {
         auto& funcall = *pfuncall;
         auto tmp = Half_Expr(funcall);
-        return Trans_Expr(table, builder, tmp);
+        auto res = Trans_Expr(table, builder, tmp, 0);
+        return res.GetLabel();
     }
     else if (auto pop = std::get_if<Half_Op>(&op))
     {
@@ -345,7 +445,7 @@ Half_Ir_Name Trans_CondOp(std::shared_ptr<Table>& table, Builder& builder, Half_
         if (binop.op != "&&" && binop.op != "||")
         {
             auto cmp = Half_Ir_Compare(binop.op, l, r, Temp::NewLabel());
-            auto br = Half_Ir_LlvmBranch(cmp, true_label, false_label);
+            auto br = Half_Ir_Branch(cmp, true_label, false_label);
             builder.AddExp(br);
             return cmp.out_label;
         }
@@ -422,7 +522,7 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         // alloc space, one time 4 bytes
         for (size_t i = 0; i < s.type.GetSize() / 4; i++)
         {
-            auto alloc = Half_Ir_Alloc(s.offset + i * 4, Temp::NewLabel());
+            auto alloc = Half_Ir_Alloc_deprecated(s.offset + i * 4, Temp::NewLabel());
             builder.AddExp(builder.block_alloc_entry, alloc);
         }
 
@@ -564,7 +664,7 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
         auto base_offset = left_ptr.GetOffset();
         if (base_offset != -1)
         {
-            auto store = Half_Ir_Store(base_offset, rval.name);
+            auto store = Half_Ir_Store_deprecated(base_offset, rval.name);
             builder.AddExp(store);
         }
         else
@@ -618,7 +718,7 @@ Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Ex
             smb.type = *(table->findType(func.parameters[i].type_name).value());
             funcscope->insert(smb);
             funcscope->labels.insert({ smb.name, Temp::NewLabel(funcscope->labels.size()) });
-            auto alloc = Half_Ir_Alloc(smb.offset, Temp::NewLabel());
+            auto alloc = Half_Ir_Alloc_deprecated(smb.offset, Temp::NewLabel());
             builder.AddExp(alloc_entry, alloc);
         }
         
@@ -955,10 +1055,15 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Let& let,
     // alloc space, one time 4 bytes
     for (size_t i = 0; i < s.type.GetSize() / 4; i++)
     {
-        auto alloc = Half_Ir_Alloc(s.offset + i * 4, Temp::NewLabel());
+        Address addr;
+        addr.offset = s.offset + i * 4;
+        addr.base = Temp::Label("bottom");
+        addr.type = Half_Type_Info::BasicType::BasicT::Int;
+        auto alloc = Half_Ir_Alloca(addr);
+        //auto alloc = Half_Ir_Alloc_deprecated(s.offset + i * 4, Temp::NewLabel());
         builder.AddExp(builder.block_alloc_entry, alloc);
     }
-    /*auto alloc = Half_Ir_Alloc(s.offset, Temp::NewLabel());
+    /*auto alloc = Half_Ir_Alloc_deprecated(s.offset, Temp::NewLabel());
     builder.AddExp(builder.block_alloc_entry, alloc);*/
 
     auto assign = Half_Expr(let.def);
@@ -968,42 +1073,13 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Let& let,
 Address Trans_Left_Var(std::shared_ptr<Table>& table, Builder& builder, Half_Var& var, int)
 {
     auto get_ptr = Trans_LeftVar_Builder(table, var, builder);
-    return get_ptr.GetResult();
+    return Trans_GetElementPtr(table, get_ptr, builder);
 }
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Var& var, int)
 {
-    /*auto symbol = table->find(var.name());
-    if (!symbol)
-    {
-        _ASSERT(false);
-        //return Half_Ir_Name("Varabile not defined:(" + var.name() + ")");
-    }
-    if (auto parray = std::get_if<Half_Var::SubscriptVar>(&var.var))
-    {
-        auto& array = *parray;
-        auto offset = symbol.value().offset;
-        auto i = Trans_Expr(table, builder, *array.index);
-        
-        auto sz = 0;
-        if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
-        {
-            _ASSERT(parray_ty);
-            sz = parray_ty->type->GetSize();
-        }
-        Half_Ir_ArrayElemLoad load(offset, i.name, sz, Temp::NewLabel());
-        builder.AddExp(load);
-        return Register{};
-        //return load.out_label;
-    }
-    auto offset = Access_Var_Offset(table, var, symbol->type);
-    auto load = Half_Ir_Load(symbol->offset + offset, Temp::NewLabel());
-    builder.AddExp(load);
-    return Register{};
-    //return load.out_label;*/
-
     auto address = Trans_Left_Var(table, builder, var, 0);
-    auto load = Load(address);
+    auto load = Half_Ir_Load(address);
     builder.AddExp(load);
     return load.GetResult();
 }
@@ -1078,7 +1154,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Assign& a
         if (auto pstruct = std::get_if<Half_Type_Info::StructType>(&pty.value()->type))
         {
             auto& struct_ty = *pstruct;
-            auto left = Trans_Var_Builder(table, assign.left, builder);
+            auto t_v = std::make_shared<Half_Var>(assign.left);
             for (size_t i = 0; i < structinit.fields.size(); i++)
             {
                 auto& init_field = structinit.fields[i];
@@ -1087,11 +1163,9 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Assign& a
                 // for now, only support simple type(first level of struct must be simple type)
 
                 Half_Assign init;
-                auto t_v = std::make_shared<Half_Var>(assign.left);
                 init.left = Half_Var::FieldVar(t_v, ty_field.name);
                 init.right = init_field.value;
-                auto init_exp = Half_Expr(init);
-                Trans_Expr(table, builder, init_exp);
+                Trans_Expr(table, builder, init, 0);
             }
             return Register{};
             //return Half_Ir_Name("StructInit, should't use this label " + structinit.type_name);
@@ -1125,19 +1199,18 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Assign& a
             auto elem_size = array_ty.type->GetSize();
 
             // TODO: use left var builder to get the array address
+            auto t_v = std::make_shared<Half_Var>(assign.left);
             for (size_t i = 0; i < arrayinit.values.size(); i++)
             {
                 auto ci = Half_Ir_Const(i);
 
                 Half_Assign init;
                 Half_Var l_var;
-                auto t_v = std::make_shared<Half_Var>(assign.left);
                 auto idx = std::make_shared<Half_Expr>(Half_Value((int)i));
                 l_var = Half_Var::SubscriptVar(t_v, idx);
                 init.left = l_var;
                 init.right = arrayinit.values[i];
-                auto init_exp = Half_Expr(init);
-                Trans_Expr(table, builder, init_exp);
+                Trans_Expr(table, builder, init, 0);
             }
             return Register{};
             //return Half_Ir_Name("ArrayInit, should't use this label " + arrayinit.type_name);
@@ -1161,21 +1234,8 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Assign& a
     // if left value is pointer, get the address of right value and store it to the left value
 
     auto address = Trans_Left_Var(table, builder, assign.left, 0);
-    Store store(rval, address);
-
-    auto left_ptr = Trans_LeftVar_Builder(table, assign.left, builder);
-    auto base_offset = left_ptr.GetOffset();
-    if (base_offset != -1)
-    {
-        auto store = Half_Ir_Store(base_offset, Temp::Label());// rval.name);
-        builder.AddExp(store);
-    }
-    else
-    {
-        builder.AddExp(left_ptr);
-        auto store = Half_Ir_ElemStore(0, symbol.value().type.GetSize(), left_ptr.out_label, Temp::Label());// rval.name);
-        builder.AddExp(store);
-    }
+    Half_Ir_Store store(rval, address);
+    builder.AddExp(store);
 
     return rval;
 }
@@ -1186,13 +1246,13 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Funcall& 
     std::vector<Half_Ir_Name> arg_exp(funcall.args.size());
     for (size_t i = 0; i < funcall.args.size(); i++)
     {
-        auto arg = Trans_Expr(table, builder, funcall.args[i]);
-        arg_exp[i] = arg.name;
+        auto arg = Trans_Expr(table, builder, funcall.args[i], 0);
+        arg_exp[i] = arg.GetLabel();
     }
     Half_Ir_Call call(Temp::NewLabel(), Temp::Label(funcall.name), arg_exp);
     builder.AddExp(call);
     //return call.out_label;
-    return Register{};
+    return Register{ {}, call.out_label };
 }
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_FuncDecl& funcDecl, int)
@@ -1220,15 +1280,18 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_FuncDecl&
         smb.name = funcDecl.parameters[i].var_name;
         smb.type = *(table->findType(funcDecl.parameters[i].type_name).value());
         funcscope->insert(smb);
-        funcscope->labels.insert({ smb.name, Temp::NewLabel(funcscope->labels.size()) });
-        auto alloc = Half_Ir_Alloc(smb.offset, Temp::NewLabel());
+        Address addr{ smb.type, Temp::Label("bottom"), smb.offset };
+        auto alloc = Half_Ir_Alloca(addr);
         builder.AddExp(alloc_entry, alloc);
+        //funcscope->labels.insert({ smb.name, Temp::NewLabel(funcscope->labels.size()) });
+        //auto alloc = Half_Ir_Alloc_deprecated(smb.offset, Temp::NewLabel());
+        //builder.AddExp(alloc_entry, alloc);
     }
     
     // 4. Translate the function body
     auto last_val = Trans_Expr(funcscope, builder, funcDecl.body, 0);
     //Half_Ir_Return ret(last_val);
-    Half_Ir_Return ret(Half_Ir_Const(0));
+    Half_Ir_Return ret(last_val);
     builder.AddExp(ret);
 
     // 5. Move all blocks in builder to function ir
@@ -1309,18 +1372,19 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if, 
     {
         auto& vec = **pvec;
         auto true_table = Table::begin_scope(table);
-        Half_Ir_Name result;
+        Value result = Register{};
         for (size_t i = 0; i < vec.size(); i++)
         {
-            result = Trans_Expr(true_table, builder, vec[i]);
-            insert_var(true_used_var, true_table, vec[i], result);
+            result = Trans_Expr(true_table, builder, vec[i], 0);
+            Half_Ir_Name l = result.GetLabel();
+            insert_var(true_used_var, true_table, vec[i], l);
         }
         auto jmp_to_phi = Half_Ir_Jump(block_if_true_phi_label);
         builder.AddExp(jmp_to_phi);
 
         // insert last result to phi node
         builder.SetInsertPoint(builder.NewBlock(block_if_true_phi_label));
-        if_result_phi.Insert(result, block_if_true_phi_label);
+        if_result_phi.Insert(Half_Ir_Name(result.GetLabel()), block_if_true_phi_label);
         auto jmp_to_end = Half_Ir_Jump(block_if_end_label);
         builder.AddExp(jmp_to_end);
     }
@@ -1335,18 +1399,19 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if, 
     {
         auto& vec = **pvec;
         auto false_table = Table::begin_scope(table);
-        Half_Ir_Name result;
+        Value result = Register{};
         for (size_t i = 0; i < vec.size(); i++)
         {
-            result = Trans_Expr(false_table, builder, vec[i]);
-            insert_var(false_used_var, false_table, vec[i], result);
+            result = Trans_Expr(false_table, builder, vec[i], 0);
+            Half_Ir_Name l = result.GetLabel();
+            insert_var(false_used_var, false_table, vec[i], l);
         }
         auto jmp_to_phi = Half_Ir_Jump(block_if_false_phi_label);
         builder.AddExp(jmp_to_phi);
 
         // insert last result to phi node
         builder.SetInsertPoint(builder.NewBlock(block_if_false_phi_label));
-        if_result_phi.Insert(result, block_if_false_phi_label);
+        if_result_phi.Insert(Half_Ir_Name(result.GetLabel()), block_if_false_phi_label);
         auto jmp_to_end = Half_Ir_Jump(block_if_end_label);
         builder.AddExp(jmp_to_end);
     }
@@ -1380,7 +1445,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if, 
 
     builder.AddExp(if_result_phi);
     //return Half_Ir_Name(if_result_phi.result);
-    return Register{};
+    return if_result_phi.GetResult();
 }
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_While& _while, int)
@@ -1409,7 +1474,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_While& _w
         auto while_table = Table::begin_scope(table);
         for (size_t i = 0; i < vec.size(); i++)
         {
-            Trans_Expr(while_table, builder, vec[i]);
+            Trans_Expr(while_table, builder, vec[i], 0);
         }
         auto jmp_to_begin = Half_Ir_Jump(cond_label);
         builder.AddExp(jmp_to_begin);
@@ -1434,11 +1499,11 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_For& _for
     auto for_table = Table::begin_scope(table);
     auto for_init = Half_Let(Half_Assign(_for.var, _for.start));
     auto init_expr = Half_Expr(for_init);
-    Trans_Expr(for_table, builder, init_expr);
+    Trans_Expr(for_table, builder, init_expr, 0);
     Half_Var termi_var(_for.var.name() + "_@for_termi");
     auto for_termi = Half_Let(Half_Assign(termi_var, _for.end));
     auto termi_expr = Half_Expr(for_termi);
-    Trans_Expr(for_table, builder, termi_expr);
+    Trans_Expr(for_table, builder, termi_expr, 0);
 
     // jump to condition block, if current block is not empty
     if (builder.blocks[builder.insert_point].exps.size() > 0)
@@ -1463,7 +1528,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_For& _for
         auto& vec = **pvec;
         for (size_t i = 0; i < vec.size(); i++)
         {
-            Trans_Expr(for_table, builder, vec[i]);
+            Trans_Expr(for_table, builder, vec[i], 0);
         }
     }
     else
@@ -1475,7 +1540,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_For& _for
     auto update = Half_Op(_for.isup ? "+" : "-", Half_Op::Half_OpExpr(_for.var), Half_Op::Half_OpExpr(Half_Value(1)));
     auto update_assign = Half_Assign(_for.var, update);
     auto update_expr = Half_Expr(update_assign);
-    Trans_Expr(for_table, builder, update_expr);
+    Trans_Expr(for_table, builder, update_expr, 0);
 
     // jump to condition block, continue the loop
     auto jmp_to_cond = Half_Ir_Jump(cond_label);

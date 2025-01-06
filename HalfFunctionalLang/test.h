@@ -971,7 +971,7 @@ function square n : int =
 end)";
     std::string prog4 =
         R"(
-function square n =
+function square (n int) : int =
     let x = n * n
     x
 end)";
@@ -1418,7 +1418,7 @@ end)";
         {   // test for code gen
             Builder b;
             auto check = TypeCheck();
-            auto e = pprogram(prog11);
+            auto e = pprogram(prog9);
             _ASSERT(e.value().second.empty());
             if (check.Check(e.value().first))
             {
@@ -1426,9 +1426,11 @@ end)";
             }
             std::vector<AS_Instr> instrs;
 
-            auto ir_name = Trans_Expr(e.value().first, b);
-            printf("\n%s\n", to_string(ir_name.name).c_str());
-
+            auto ir_name = Trans_Expr(e.value().first, b, 0);
+            printf("\nbuilder exprs count: %zd\n", b.blocks[0].exps.size());
+            
+            //printf("\n%s\n", to_string(ir_name.name).c_str());
+            
             MunchExps_llvmlike(b, instrs);
 
             printf("\nCount %zd\n", instrs.size());

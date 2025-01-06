@@ -58,13 +58,15 @@ struct Symbol
         , type(o.type)
         , value(o.value)
         , offset(o.offset)
+        , addr(o.addr)
     {}
 
 
     std::string name;
     Half_Type_Info type;
     BasicValue value;
-    size_t offset = 0;
+    ptrdiff_t offset = 0;
+    Address addr;
 };
 
 struct FunctionSymbol
@@ -118,7 +120,7 @@ struct Table
     size_t total_size = 0;
     std::map<std::string, Symbol> values;
     std::map<std::string, FunctionSymbol> funcs;
-    std::map<std::string, Temp::Label> labels;
+    //std::map<std::string, Temp::Label> labels;
     std::map<std::string, std::shared_ptr<Half_Type_Info>> types;
 };
 
@@ -129,7 +131,7 @@ struct Stack
 
     // TODO: stack alloc need to know the data size and align size
     //   also need to know the start from ebp(top) or esp(bottom)
-    size_t Alloc(size_t size)
+    ptrdiff_t Alloc(size_t size)
     {
         size_t res = offset;
         offset += size;

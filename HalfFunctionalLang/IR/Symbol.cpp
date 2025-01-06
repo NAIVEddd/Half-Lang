@@ -15,7 +15,11 @@ void Table::insert(Symbol& s)
     auto sz = s.type.GetSize();
     sz = sz ? sz : 4;
     total_size += sz;
-    s.offset = stack->Alloc(sz);
+    s.addr.offset = stack->Alloc(sz);
+    s.addr.type = s.type;
+    s.addr.base = Temp::Label("bottom");
+    //s.offset = stack->Alloc(sz);
+    s.offset = s.addr.offset;
     values.insert({ s.name, s });
 }
 

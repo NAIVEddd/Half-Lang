@@ -16,7 +16,43 @@ void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs)
 
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
 {
-    if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&exp.exp))
+    if (auto pload = std::get_if<std::shared_ptr<Half_Ir_Load>>(&exp.exp))
+    {
+        printf("Half_Ir_Load:\n");
+        auto base_l = (*pload)->address.base.l;
+        auto reg = base_l == "bottom" ? "(%rsp)"
+            : (base_l == "top" ? "(%rbp)" : "(" + base_l + ")");
+        auto l = Temp::Label(std::to_string((*pload)->address.offset) + reg);
+        AS_Move move((*pload)->out_register.reg, l);
+        instrs.push_back(move);
+        return;
+    }
+    else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_Store>>(&exp.exp))
+    {
+        printf("Half_Ir_Store:\n");
+        auto base_l = (*pstore)->address.base.l;
+        auto reg = base_l == "bottom" ? "(%rsp)"
+            : (base_l == "top" ? "(%rbp)" : "(" + base_l + ")");
+        auto l = Temp::Label(std::to_string((*pstore)->address.offset) + reg);
+        if (std::holds_alternative<Register>((*pstore)->value.value))
+        {
+            auto val = std::get<Register>((*pstore)->value.value);
+            AS_Move move(l, val.reg);
+            instrs.push_back(move);
+            return;
+        }
+        else if (std::holds_alternative<Address>((*pstore)->value.value))
+        {
+            /*auto& addr = std::get<Address>((*pstore)->value.value);
+            auto reg = addr.base.l == "bottom" ? "(%rsp)" : "(%rbp)";
+            auto l = Temp::Label(std::to_string(addr.offset) + reg);
+            AS_Move move(l, (*pstore)->in_register.reg);
+            instrs.push_back(move);*/
+            //return;
+        }
+        _ASSERT(false);
+    }
+    else if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&exp.exp))
     {
         auto t = (*pconst)->out_label;
         instrs.push_back(AS_Move(t, Temp::Label("$" + std::to_string((*pconst)->n))));
@@ -116,21 +152,21 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         instrs.back() = AS_Return(stack_size);
         return;
     }
-    else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_Load>>(&exp.exp))
+    /*else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_Load_deprecated>>(&exp.exp))
     {
         printf("Half_Ir_Load\n");
         auto l = Temp::Label(std::to_string((*pload)->offset) + std::string("(%rsp)"));
         instrs.push_back(AS_Move((*pload)->out_label, l));
         return;
-    }
-    else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_Store>>(&exp.exp))
+    }*/
+    /*else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_Store_deprecated>>(&exp.exp))
     {
         printf("Half_Ir_Store\n");
         auto l = Temp::Label(std::to_string(std::get<size_t>((*pstore)->data)) + std::string("(%rsp)"));
         instrs.push_back(AS_Move(l, (*pstore)->in_label));
         return;
-    }
-    else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_ElemLoad>>(&exp.exp))
+    }*/
+    /*else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_ElemLoad>>(&exp.exp))
     {
         printf("Half_Ir_ElemLoad\n");
         auto& load = **pload;
@@ -145,11 +181,11 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         AS_ElemStore as_store(store.elem_offset, store.size, store.elem_ptr, store.in_label);
         instrs.push_back(as_store);
         return;
-    }
+    }*/
     else if (auto pgetptr = std::get_if<std::shared_ptr<Half_Ir_GetElementPtr>>(&exp.exp))
     {
         printf("Half_Ir_GetElementPtr\n");
-        auto& getptr = **pgetptr;
+        /*auto& getptr = **pgetptr;
         std::vector<Temp::Label> offsets;
         for (size_t i = 0; i < getptr.in_index.size(); ++i)
         {
@@ -157,7 +193,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
             Half_Ir_Const c(getptr.elem_sizes[i]);
             MunchExp_llvmlike(Half_Ir_Exp(c), instrs);
             Temp::Label offset = Temp::NewLabel();
-            Half_Ir_LlvmBinOp binop(Half_Ir_LlvmBinOp::Oper::Multy, getptr.exp_out_labels[i], c.out_label, offset);
+            Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, getptr.exp_out_labels[i], c.out_label, offset);
             MunchExp_llvmlike(Half_Ir_Exp(binop), instrs);
             offsets.push_back(offset);
         }
@@ -165,13 +201,13 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         {
             Temp::Label base = Temp::NewLabel();
             instrs.push_back(AS_ElemPtr(getptr.offset, Temp::Label("%rsp"), base));
-            Half_Ir_LlvmBinOp binop(Half_Ir_LlvmBinOp::Oper::Plus, base, offsets[0], Temp::NewLabel());
+            Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Plus, base, offsets[0], Temp::NewLabel());
             MunchExp_llvmlike(Half_Ir_Exp(binop), instrs);
             instrs.push_back(AS_ElemPtr(0, binop.out_label, getptr.out_label));
-        }
+        }*/
         return;
     }
-    else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_ArrayElemLoad>>(&exp.exp))
+    /*else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_ArrayElemLoad>>(&exp.exp))
     {
         printf("Half_Ir_ArrayElemLoad\n");
         auto& load = **pload;
@@ -186,29 +222,29 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         AS_ArrayStore as_store(store.index, store.in_label, store.array_offset, store.size);
         instrs.push_back(as_store);
         return;
-    }
-    else if (auto pop = std::get_if<std::shared_ptr<Half_Ir_LlvmBinOp>>(&exp.exp))
+    }*/
+    else if (auto pop = std::get_if<std::shared_ptr<Half_Ir_BinOp>>(&exp.exp))
     {
         auto& binop = **pop;
         printf("Half_Ir_Op\n");
         auto movl = binop.left.name;
         auto movr = binop.right.name;
-        auto tostring = [](Half_Ir_LlvmBinOp::Oper op)
+        auto tostring = [](Half_Ir_BinOp::Oper op)
             {
                 switch (op)
                 {
-                case Half_Ir_LlvmBinOp::Oper::Unknow:
+                case Half_Ir_BinOp::Oper::Unknow:
                     break;
-                case Half_Ir_LlvmBinOp::Oper::Plus:
+                case Half_Ir_BinOp::Oper::Plus:
                     return std::string("add");
                     break;
-                case Half_Ir_LlvmBinOp::Oper::Minus:
+                case Half_Ir_BinOp::Oper::Minus:
                     return std::string("sub");
                     break;
-                case Half_Ir_LlvmBinOp::Oper::Multy:
+                case Half_Ir_BinOp::Oper::Multy:
                     return std::string("imul");
                     break;
-                case Half_Ir_LlvmBinOp::Oper::Divide:
+                case Half_Ir_BinOp::Oper::Divide:
                     return std::string("idiv");
                     break;
                 default:
@@ -236,10 +272,8 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     {
         printf("Half_Ir_Return\n");
         auto v = (*pret)->value;
-        if (auto pn = std::get_if<std::shared_ptr<Half_Ir_Name>>(&v.exp))
-        {
-            instrs.push_back(AS_Move(Temp::Label("%eax"), (*pn)->name));
-        }
+        auto label = v.GetLabel();
+        instrs.push_back(AS_Move(Temp::Label("%eax"), label));
         instrs.push_back(AS_Return());
         return;
     }
@@ -269,7 +303,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         instrs.push_back(AS_Move(dst, src));
         return;
     }
-    else if (auto pbr = std::get_if<std::shared_ptr<Half_Ir_LlvmBranch>>(&exp.exp))
+    else if (auto pbr = std::get_if<std::shared_ptr<Half_Ir_Branch>>(&exp.exp))
     {
         printf("Half_Ir_Branch\n");
         auto& branch = **pbr;

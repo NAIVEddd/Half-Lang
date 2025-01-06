@@ -9,95 +9,47 @@
 //struct Half_Ir;
 struct Half_Ir_Exp;
 struct Half_Ir_Stm;
+struct Half_Ir_Alloca;
+struct Half_Ir_Load;
+struct Half_Ir_Store;
 struct Half_Ir_Const;
 struct Half_Ir_Float;
 struct Half_Ir_String;
 struct Half_Ir_Name;
 struct Half_Ir_Call;
-struct Half_Ir_LlvmBinOp;
+struct Half_Ir_BinOp;
 struct Half_Ir_Compare;
-struct Half_Ir_Memory;
-struct Half_Ir_LlvmBranch;  // branch llvm like
-struct Half_Ir_Func;
+struct Half_Ir_Branch;  // branch llvm like
 struct Half_Ir_Move;
 struct Half_Ir_Label;
 struct Half_Ir_Jump;
-struct Half_Ir_Seq;
-struct Half_Ir_Load;
-struct Half_Ir_Store;
-struct Half_Ir_ArrayElemLoad;
-struct Half_Ir_ArrayElemStore;
-struct Half_Ir_ElemLoad;
-struct Half_Ir_ElemStore;
 struct Half_Ir_GetElementPtr;
-struct Half_Ir_Alloc;
 struct Half_Ir_Return;
 struct Half_Ir_Value;
 struct Half_Ir_Function;
 struct Half_Ir_Phi;
 
-struct Alloca;
-struct Load;
-struct Store;
-
-struct Half_Ir_Instruction
-{
-    using Type = std::variant<
-        std::monostate,
-        std::shared_ptr<Half_Ir_Const>,
-        std::shared_ptr<Half_Ir_Load>,
-        std::shared_ptr<Half_Ir_Store>,
-        std::shared_ptr<Half_Ir_GetElementPtr>,
-        std::shared_ptr<Half_Ir_Alloc>,
-        std::shared_ptr<Half_Ir_Return>,
-        std::shared_ptr<Half_Ir_Function>,
-        std::shared_ptr<Half_Ir_Value>,
-        std::shared_ptr<Half_Ir_Call>,
-        std::shared_ptr<Half_Ir_LlvmBinOp>,
-        std::shared_ptr<Half_Ir_LlvmBranch>,
-        std::shared_ptr<Half_Ir_Move>,
-        std::shared_ptr<Half_Ir_Label>,
-        std::shared_ptr<Half_Ir_Phi>,
-        std::shared_ptr<Half_Ir_Jump>
-    >;
-    Type inst;
-
-    Half_Ir_Instruction() = default;
-    template<typename T>
-    Half_Ir_Instruction(T t) : inst(std::make_shared<T>(t)) {}
-    Half_Ir_Instruction(const Half_Ir_Instruction& o) : inst(o.inst) {}
-};
 
 struct Half_Ir_Exp
 {
     using Type = std::variant<
         std::monostate,
-        std::shared_ptr<Alloca>,
-        std::shared_ptr<Load>,
-        std::shared_ptr<Store>,
-        std::shared_ptr<Half_Ir_Const>,
+        std::shared_ptr<Half_Ir_Alloca>,
         std::shared_ptr<Half_Ir_Load>,
         std::shared_ptr<Half_Ir_Store>,
-        std::shared_ptr<Half_Ir_ArrayElemLoad>,
-        std::shared_ptr<Half_Ir_ArrayElemStore>,
-        std::shared_ptr<Half_Ir_ElemLoad>,
-        std::shared_ptr<Half_Ir_ElemStore>,
+        std::shared_ptr<Half_Ir_Const>,
         std::shared_ptr<Half_Ir_GetElementPtr>,
-        std::shared_ptr<Half_Ir_Alloc>,
         std::shared_ptr<Half_Ir_Return>,
         std::shared_ptr<Half_Ir_Function>,
         std::shared_ptr<Half_Ir_Name>,
         std::shared_ptr<Half_Ir_Value>,
         std::shared_ptr<Half_Ir_Call>,
-        std::shared_ptr<Half_Ir_LlvmBinOp>,
-        std::shared_ptr<Half_Ir_Memory>,
-        std::shared_ptr<Half_Ir_LlvmBranch>,
-        std::shared_ptr<Half_Ir_Func>,
+        std::shared_ptr<Half_Ir_BinOp>,
+        std::shared_ptr<Half_Ir_Branch>,
         std::shared_ptr<Half_Ir_Move>,
         std::shared_ptr<Half_Ir_Label>,
         std::shared_ptr<Half_Ir_Phi>,
-        std::shared_ptr<Half_Ir_Jump>,
-        std::shared_ptr<Half_Ir_Seq>
+        std::shared_ptr<Half_Ir_Jump>
     >;
     Type exp;
 
@@ -121,7 +73,7 @@ struct Address
 {   // format as offset(base)
     Half_Type_Info type;
     Temp::Label base;
-    size_t offset;
+    ptrdiff_t offset;
 };
 struct Register
 {
@@ -142,7 +94,7 @@ struct Value
         {
             return std::get<Register>(value).reg;
         }
-        return Temp::Label("Invalid Value Label");
+        return Temp::Label("Value Invalid Label");
     }
 
     std::variant<Address, Register> value;
@@ -152,10 +104,10 @@ struct Value
 
 // TODO: alloca from bottom of the stack(offset is positive)
 //               or top of the stack(offset is negative)
-struct Alloca
+struct Half_Ir_Alloca
 {
     Address out_address;
-    Alloca(Address a) : out_address(a) {}
+    Half_Ir_Alloca(Address a) : out_address(a) {}
     Value GetResult() const
     {
         return Value(out_address);
@@ -165,12 +117,12 @@ struct Alloca
 // alloca return a address
 // format address to offset(rsp)
 // so load become Mov offset(rsp), out_label
-struct Load
+struct Half_Ir_Load
 {
     Address address;
     Register out_register;
-    Load(Address a) : address(a), out_register(Register{ a.type, Temp::NewLabel() }) {}
-    Load(Address a, Register r) : address(a), out_register(r) {}
+    Half_Ir_Load(Address a) : address(a), out_register(Register{ a.type, Temp::NewLabel() }) {}
+    Half_Ir_Load(Address a, Register r) : address(a), out_register(r) {}
     Value GetResult() const
     {
         return Value(out_register);
@@ -178,11 +130,11 @@ struct Load
 };
 
 // store value to memory
-struct Store
+struct Half_Ir_Store
 {
     Value value;
     Address address;
-    Store(Value v, Address a) : value(v), address(a) {}
+    Half_Ir_Store(Value v, Address a) : value(v), address(a) {}
 };
 
 // struct Half_Ir_GetElementPtr
@@ -209,103 +161,48 @@ struct Half_Ir_Const
     }
 };
 
-struct Half_Ir_Alloc
-{
-    size_t offset;
-    Temp::Label out_label;
-    Half_Ir_Alloc(size_t off, Temp::Label l) : offset(off), out_label(l) {}
-    Half_Ir_Alloc(const Half_Ir_Alloc& a) : offset(a.offset), out_label(a.out_label) {}
-};
-
-struct Half_Ir_Load
-{
-    //size_t size;  // size of the data(4 bytes, 8 bytes, ...) maybe it should be a type
-    size_t offset;
-    Temp::Label out_label;
-    Half_Ir_Load(size_t off, Temp::Label l) : offset(off), out_label(l) {}
-    Half_Ir_Load(const Half_Ir_Load& load) : offset(load.offset), out_label(load.out_label) {}
-};
-
-struct Half_Ir_Store
-{
-    // store data to memory
-    //   data maybe a register or a constant
-    std::variant<size_t, Half_Ir_Const> data;
-    Temp::Label in_label;
-    Half_Ir_Store(size_t off, Temp::Label l) : data(off), in_label(l) {}
-    Half_Ir_Store(Half_Ir_Const c, Temp::Label l) : data(c), in_label(l) {}
-    Half_Ir_Store(const Half_Ir_Store& store) : data(store.data), in_label(store.in_label) {}
-};
-
-struct Half_Ir_ElemLoad
-{
-    // load data from memory
-    //  elem_offset(elem_ptr) = elem_ptr + elem_offset (read 4 or 8 bytes from memory)
-    size_t elem_offset;
-    size_t size;    // int is 4, ...
-    Temp::Label elem_ptr;
-    Temp::Label out_label;
-    Half_Ir_ElemLoad(size_t off, size_t sz, Temp::Label ptr, Temp::Label l)
-        : elem_offset(off), size(sz), elem_ptr(ptr), out_label(l) {}
-    Half_Ir_ElemLoad(const Half_Ir_ElemLoad& a)
-        : elem_offset(a.elem_offset), size(a.size), elem_ptr(a.elem_ptr), out_label(a.out_label) {}
-};
-
-struct Half_Ir_ElemStore
-{
-    // store data to memory
-    //   elem_offset(elem_ptr) = elem_ptr + elem_offset (write 4 or 8 bytes to memory)
-    size_t elem_offset;
-    size_t size;    // int is 4, ...
-    Temp::Label elem_ptr;
-    Temp::Label in_label;
-    Half_Ir_ElemStore(size_t off, size_t sz, Temp::Label ptr, Temp::Label l)
-        : elem_offset(off), size(sz), elem_ptr(ptr), in_label(l) {}
-    Half_Ir_ElemStore(const Half_Ir_ElemStore& a)
-        : elem_offset(a.elem_offset), size(a.size), elem_ptr(a.elem_ptr), in_label(a.in_label) {}
-};
-
-struct Half_Ir_ArrayElemLoad
-{
-    size_t array_offset;
-    size_t size;    // int is 4, ...
-    Temp::Label index;
-    Temp::Label out_label;
-    Half_Ir_ArrayElemLoad(size_t off, Temp::Label elem_index, size_t sz, Temp::Label l) : array_offset(off), size(sz), index(elem_index), out_label(l) {}
-    Half_Ir_ArrayElemLoad(const Half_Ir_ArrayElemLoad& a) : array_offset(a.array_offset), size(a.size), index(a.index), out_label(a.out_label) {}
-};
-
-struct Half_Ir_ArrayElemStore
-{
-    size_t array_offset;
-    size_t size;    // int is 4, ...
-    Temp::Label index;
-    Temp::Label in_label;
-    Half_Ir_ArrayElemStore(size_t off, Temp::Label elem_index, size_t sz, Temp::Label l) : array_offset(off), size(sz), index(elem_index), in_label(l) {}
-    Half_Ir_ArrayElemStore(const Half_Ir_ArrayElemStore& a) : array_offset(a.array_offset), size(a.size), index(a.index), in_label(a.in_label) {}
-};
-
 struct Half_Ir_GetElementPtr
 {
-    size_t offset = 0;
+    using Indexer = std::variant<Half_Ir_Const, Value>;
+    ptrdiff_t offset = 0;
+    Temp::Label base;
+    Half_Type_Info source_element_type;
+    Half_Type_Info result_element_type;
+    std::vector<Indexer> in_indexs;
     std::vector<size_t> elem_sizes;
     std::vector<Half_Ir_Exp> in_index;
     std::vector<Temp::Label> exp_out_labels;
     Temp::Label out_label;
-    Half_Ir_GetElementPtr(Temp::Label l = Temp::NewLabel())
-        : out_label(l) {}
-    Half_Ir_GetElementPtr(size_t off, Temp::Label l = Temp::NewLabel())
-        : offset(off), out_label(l) {}
-    Half_Ir_GetElementPtr(size_t off, std::vector<size_t> szs, std::vector<Half_Ir_Exp> ls, Temp::Label out = Temp::NewLabel())
-        : offset(off), elem_sizes(szs), in_index(ls), out_label(out) {}
+    Half_Ir_GetElementPtr() = default;
+    Half_Ir_GetElementPtr(Temp::Label b, Temp::Label l = Temp::NewLabel())
+        : base(b), out_label(l) {}
+    Half_Ir_GetElementPtr(Address a, Temp::Label l = Temp::NewLabel())
+        : offset(a.offset), base(a.base), out_label(l)
+        , source_element_type(Half_Type_Info::PointerType(a.type))
+    {
+        result_element_type = source_element_type;
+    }
     Half_Ir_GetElementPtr(const Half_Ir_GetElementPtr& g)
-        : offset(g.offset), elem_sizes(g.elem_sizes)
-        , in_index(g.in_index), exp_out_labels(g.exp_out_labels), out_label(g.out_label) {};
-    
-    Address GetResult() const
+        : offset(g.offset), base(g.base)
+        , source_element_type(g.source_element_type), result_element_type(g.result_element_type)
+        , in_indexs(g.in_indexs), elem_sizes(g.elem_sizes), in_index(g.in_index), exp_out_labels(g.exp_out_labels), out_label(g.out_label) {
+    }
+
+    void AddIndex(Indexer idx)
+    {
+        in_indexs.push_back(idx);
+    }
+
+    Half_Type_Info GetResultType() const
+    {
+
+        return result_element_type;
+    }
+
+    /*Address GetResult() const
     {
         return Address{ Half_Type_Info::BasicType::BasicT::Int, out_label, offset };
-    }
+    }*/
 
     size_t GetOffset() const
     {
@@ -314,7 +211,7 @@ struct Half_Ir_GetElementPtr
         {
             return -1;
         }
-        size_t sz = offset;
+        ptrdiff_t sz = offset;
         for (size_t i = 0; i < elem_sizes.size(); i++)
         {
             if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&in_index[i].exp))
@@ -344,8 +241,8 @@ struct Half_Ir_GetElementPtr
 
 struct Half_Ir_Return
 {
-    Half_Ir_Exp value;
-    Half_Ir_Return(Half_Ir_Exp e) : value(e) {}
+    Value value;
+    Half_Ir_Return(Value e) : value(e) {}
     Half_Ir_Return(const Half_Ir_Return& e) : value(e.value) {}
 };
 
@@ -397,7 +294,7 @@ struct Half_Ir_Value
     Half_Ir_Value(const Half_Ir_Value& o) : val(o.val), out_label(o.out_label) {}
 };
 
-struct Half_Ir_LlvmBinOp
+struct Half_Ir_BinOp
 {
     enum class Oper
     {
@@ -410,12 +307,18 @@ struct Half_Ir_LlvmBinOp
     Half_Ir_Name left;
     Half_Ir_Name right;
     Temp::Label out_label;
-    Half_Ir_LlvmBinOp(std::string o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+    Half_Ir_BinOp(std::string o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
         : op(GetOper(o)), left(l), right(r), out_label(out) {}
-    Half_Ir_LlvmBinOp(Oper o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+    Half_Ir_BinOp(Oper o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
         : op(o), left(l), right(r), out_label(out) {}
-    Half_Ir_LlvmBinOp(const Half_Ir_LlvmBinOp& o)
+    Half_Ir_BinOp(const Half_Ir_BinOp& o)
         : op(o.op), left(o.left), right(o.right), out_label(o.out_label) {}
+    
+    Value GetResult() const
+    {
+        return Value(Register{ Half_Type_Info::BasicType::BasicT::Int, out_label });
+    }
+    
     static Oper GetOper(std::string s)
     {
         static std::map<std::string, Oper> map =
@@ -448,7 +351,7 @@ struct Half_Ir_LlvmBinOp
 
 struct Half_Ir_Compare
 {
-    using Oper = Half_Ir_LlvmBinOp::Oper;
+    using Oper = Half_Ir_BinOp::Oper;
     Oper op;
     Half_Ir_Name left;
     Half_Ir_Name right;
@@ -461,7 +364,7 @@ struct Half_Ir_Compare
         : op(c.op), left(c.left), right(c.right), out_label(c.out_label) {}
     static Oper GetOper(std::string s)
     {
-        return Half_Ir_LlvmBinOp::GetOper(s);
+        return Half_Ir_BinOp::GetOper(s);
     }
     static Oper GetNot(Oper op)
     {
@@ -497,12 +400,6 @@ struct Half_Ir_Call
         : fun_name(c.fun_name), args(c.args), out_label(c.out_label) {}
 };
 
-struct Half_Ir_Memory
-{
-    size_t offset;
-    Half_Ir_Memory(size_t o) : offset(o) {}
-};
-
 struct Half_Ir_Label
 {
     Temp::Label lab;
@@ -510,12 +407,12 @@ struct Half_Ir_Label
     Half_Ir_Label(const Half_Ir_Label& l) : lab(l.lab) {}
 };
 
-struct Half_Ir_LlvmBranch
+struct Half_Ir_Branch
 {
     Half_Ir_Compare condition;
     Temp::Label true_label;
     Temp::Label false_label;
-    Half_Ir_LlvmBranch(Half_Ir_Compare cond, Temp::Label tl, Temp::Label fl)
+    Half_Ir_Branch(Half_Ir_Compare cond, Temp::Label tl, Temp::Label fl)
         : condition(cond), true_label(tl), false_label(fl)
     {
     }
@@ -527,19 +424,15 @@ struct Half_Ir_Phi
     std::vector<std::pair<Half_Ir_Name, Half_Ir_Label>> values;
     Half_Ir_Phi(Half_Ir_Name r) : result(r) {}
     Half_Ir_Phi(const Half_Ir_Phi& p) : result(p.result), values(p.values) {}
+    Value GetResult() const
+    {
+        return Value(Register{ Half_Type_Info::BasicType::BasicT::Int, result.name });
+    }
     // insert
     void Insert(Half_Ir_Name n, Half_Ir_Label l)
     {
         values.push_back({ n, l });
     }
-};
-
-struct Half_Ir_Func
-{
-    Half_Ir_Label name;
-    Half_Ir_Exp body;
-    Half_Ir_Func(Half_Ir_Label n, Half_Ir_Exp b)
-        : name(n), body(b) {}
 };
 
 struct Half_Ir_Jump
@@ -554,13 +447,6 @@ struct Half_Ir_Move
     Half_Ir_Exp right;
     Half_Ir_Move(Half_Ir_Exp l, Half_Ir_Exp r)
         :left(l), right(r) {}
-};
-
-struct Half_Ir_Seq
-{
-    std::vector<Half_Ir_Exp> seq;
-    Half_Ir_Seq(std::vector<Half_Ir_Exp>& s) : seq(s) {}
-    Half_Ir_Seq(std::vector<Half_Ir_Exp>&& s) : seq(std::move(s)) {}
 };
 
 struct Half_IR

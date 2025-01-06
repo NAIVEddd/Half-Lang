@@ -68,6 +68,12 @@ size_t Half_Type_Info::GetSize()
     }, type);
 }
 
+Half_Type_Info::StructType::TypePair& Half_Type_Info::StructType::GetField(size_t index)
+{
+    _ASSERT(index < field_list.size());
+    return field_list[index];
+}
+
 Half_Type_Info::StructType::TypePair& Half_Type_Info::StructType::GetField(std::string name)
 {
     for (auto& f : field_list)
@@ -80,4 +86,17 @@ Half_Type_Info::StructType::TypePair& Half_Type_Info::StructType::GetField(std::
     // TODO: error report
     _ASSERT(false);
     return field_list[0];
+}
+
+size_t Half_Type_Info::StructType::GetFieldIndex(std::string name)
+{
+    for (size_t i = 0; i < field_list.size(); i++)
+    {
+        if (field_list[i].name == name)
+        {
+            return i;
+        }
+    }
+    _ASSERT(false);
+    return -1;
 }
