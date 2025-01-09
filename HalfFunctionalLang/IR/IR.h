@@ -24,6 +24,7 @@ struct Half_Ir_Move;
 struct Half_Ir_Label;
 struct Half_Ir_Jump;
 struct Half_Ir_GetElementPtr;
+struct Half_Ir_FetchPtr;
 struct Half_Ir_Return;
 struct Half_Ir_Value;
 struct Half_Ir_Function;
@@ -39,6 +40,7 @@ struct Half_Ir_Exp
         std::shared_ptr<Half_Ir_Store>,
         std::shared_ptr<Half_Ir_Const>,
         std::shared_ptr<Half_Ir_GetElementPtr>,
+        std::shared_ptr<Half_Ir_FetchPtr>,
         std::shared_ptr<Half_Ir_Return>,
         std::shared_ptr<Half_Ir_Function>,
         std::shared_ptr<Half_Ir_Name>,
@@ -236,6 +238,22 @@ struct Half_Ir_GetElementPtr
             return false;
         }
         return true;
+    }
+};
+
+struct Half_Ir_FetchPtr
+{
+    Address ptr;
+    Temp::Label out_label;
+    Half_Ir_FetchPtr(Address p, Temp::Label l = Temp::NewLabel())
+        : ptr(p), out_label(l) {
+    }
+    Half_Ir_FetchPtr(const Half_Ir_FetchPtr& f)
+        : ptr(f.ptr), out_label(f.out_label) {
+    }
+    Value GetResult() const
+    {
+        return Value(Register{ Half_Type_Info::PointerType(ptr.type), out_label });
     }
 };
 

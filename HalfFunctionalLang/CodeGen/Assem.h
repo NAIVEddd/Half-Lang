@@ -23,6 +23,17 @@ struct AS_Oper
         : assem(o.assem), dst(o.dst), src(o.src) {}
 };
 
+struct AS_Lea
+{
+    Temp::Label dst;
+    Temp::Label src;
+    ptrdiff_t offset;
+    AS_Lea(Temp::Label d, Temp::Label s, size_t off)
+        : dst(d), src(s), offset(off) {}
+    AS_Lea(const AS_Lea& o)
+        : dst(o.dst), src(o.src), offset(o.offset) {}
+};
+
 struct AS_Move
 {
     Temp::Label dst;
@@ -42,11 +53,9 @@ struct AS_ElemPtr
     Temp::Label elem_ptr;
     Temp::Label out_label;
     AS_ElemPtr(size_t off, Temp::Label ptr, Temp::Label l)
-        : elem_offset(off), elem_ptr(ptr), out_label(l) {
-    }
+        : elem_offset(off), elem_ptr(ptr), out_label(l) {}
     AS_ElemPtr(const AS_ElemPtr& a)
-        : elem_offset(a.elem_offset), elem_ptr(a.elem_ptr), out_label(a.out_label) {
-    }
+        : elem_offset(a.elem_offset), elem_ptr(a.elem_ptr), out_label(a.out_label) {}
 };
 
 struct AS_ElemLoad
@@ -161,7 +170,7 @@ struct AS_Return
     AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
-using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
 struct AS_Function
 {

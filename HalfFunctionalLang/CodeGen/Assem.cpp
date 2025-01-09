@@ -152,36 +152,6 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         instrs.back() = AS_Return(stack_size);
         return;
     }
-    /*else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_Load_deprecated>>(&exp.exp))
-    {
-        printf("Half_Ir_Load\n");
-        auto l = Temp::Label(std::to_string((*pload)->offset) + std::string("(%rsp)"));
-        instrs.push_back(AS_Move((*pload)->out_label, l));
-        return;
-    }*/
-    /*else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_Store_deprecated>>(&exp.exp))
-    {
-        printf("Half_Ir_Store\n");
-        auto l = Temp::Label(std::to_string(std::get<size_t>((*pstore)->data)) + std::string("(%rsp)"));
-        instrs.push_back(AS_Move(l, (*pstore)->in_label));
-        return;
-    }*/
-    /*else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_ElemLoad>>(&exp.exp))
-    {
-        printf("Half_Ir_ElemLoad\n");
-        auto& load = **pload;
-        AS_ElemLoad as_load(load.elem_offset, load.size, load.elem_ptr, load.out_label);
-        instrs.push_back(as_load);
-        return;
-    }
-    else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_ElemStore>>(&exp.exp))
-    {
-        printf("Half_Ir_ElemStore\n");
-        auto& store = **pstore;
-        AS_ElemStore as_store(store.elem_offset, store.size, store.elem_ptr, store.in_label);
-        instrs.push_back(as_store);
-        return;
-    }*/
     else if (auto pgetptr = std::get_if<std::shared_ptr<Half_Ir_GetElementPtr>>(&exp.exp))
     {
         printf("Half_Ir_GetElementPtr\n");
@@ -207,22 +177,19 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         }*/
         return;
     }
-    /*else if (auto pload = std::get_if<std::shared_ptr<Half_Ir_ArrayElemLoad>>(&exp.exp))
+    else if (auto pfetch = std::get_if<std::shared_ptr<Half_Ir_FetchPtr>>(&exp.exp))
     {
-        printf("Half_Ir_ArrayElemLoad\n");
-        auto& load = **pload;
-        AS_ArrayLoad as_load(load.out_label, load.index, load.array_offset, load.size);
-        instrs.push_back(as_load);
+        printf("Half_Ir_FetchPtr\n");
+        auto& fetch = **pfetch;
+        auto base_l = fetch.ptr.base.l;
+        auto reg = base_l == "bottom" ? "rsp"
+            : (base_l == "top" ? "rbp" : base_l);
+        auto l = Temp::Label(reg);
+        auto offset = fetch.ptr.offset;
+        AS_Lea lea(fetch.out_label, l, offset);
+        instrs.push_back(lea);/**/
         return;
     }
-    else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_ArrayElemStore>>(&exp.exp))
-    {
-        printf("Half_Ir_ArrayElemStore\n");
-        auto& store = **pstore;
-        AS_ArrayStore as_store(store.index, store.in_label, store.array_offset, store.size);
-        instrs.push_back(as_store);
-        return;
-    }*/
     else if (auto pop = std::get_if<std::shared_ptr<Half_Ir_BinOp>>(&exp.exp))
     {
         auto& binop = **pop;
@@ -344,6 +311,12 @@ inline std::string to_string(const AS_Move& mv)
     auto dst = mv.dst.l.starts_with('e') ? "%" + mv.dst.l : mv.dst.l;
     return std::string("movl ") + src + ", " + dst + "\n";
 }
+inline std::string to_string(const AS_Lea& lea)
+{
+    auto src = lea.src.l.starts_with('e') ? "%" + lea.src.l : lea.src.l;
+    auto dst = lea.dst.l.starts_with('e') ? "%" + lea.dst.l : lea.dst.l;
+    return std::string("leaq ") + std::to_string(lea.offset) + "(" + src + "), " + dst + "\n";
+}
 inline std::string to_string(const AS_ElemPtr& mv)
 {
     auto elem_ptr = mv.elem_ptr.l.starts_with('e') ? "%" + mv.elem_ptr.l : mv.elem_ptr.l;
@@ -415,6 +388,10 @@ std::string to_string(const AS_Instr& instr)
     else if (auto pmv = std::get_if<AS_Move>(&instr))
     {
         return to_string(*pmv);
+    }
+    else if (auto plea = std::get_if<AS_Lea>(&instr))
+    {
+        return to_string(*plea);
     }
     else if (auto pmv = std::get_if<AS_ElemPtr>(&instr))
     {

@@ -44,6 +44,10 @@ std::vector<Temp::Label> Node::Def() const
     {
         labels.push_back(pmv->dst);
     }
+    else if (auto plea = std::get_if<AS_Lea>(&info))
+    {
+        labels.push_back(plea->dst);
+    }
     else if (auto pptr = std::get_if<AS_ElemPtr>(&info))
     {
         labels.push_back(pptr->out_label);
@@ -92,6 +96,10 @@ std::vector<Temp::Label> Node::Use() const
     else if (auto pmv = std::get_if<AS_Move>(&info))
     {
         labels.push_back(pmv->src);
+    }
+    else if (auto plea = std::get_if<AS_Lea>(&info))
+    {
+        labels.push_back(plea->src);
     }
     else if (auto pptr = std::get_if<AS_ElemPtr>(&info))
     {

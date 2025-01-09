@@ -11,9 +11,5 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
 
 void Init_Basic_Type(std::shared_ptr<Table>& table);
 std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl& type);
-Half_Ir_Name Trans_Expr(Half_Expr& expr, Builder& builder);
-Half_Ir_Name Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& expr);
-Value Trans_Expr(Half_Expr& expr, Builder& builder, int);
-Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& expr, int);
-
-const Half_Ir_Name& Trans_Var(std::shared_ptr<Table>& table, Half_Var& var, Builder& builder);
+Value Trans_Expr(Half_Expr& expr, Builder& builder);
+Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& expr);
