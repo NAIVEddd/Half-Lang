@@ -89,6 +89,8 @@ struct Half_Type_Info
     template<typename T>
     Half_Type_Info(const T& t) : type(t) {}
     Half_Type_Info(const Half_Type_Info& o) : type(o.type) {}
+    bool is_pointer() const;
+    bool is_basic() const;
 
     size_t GetSize();
 };

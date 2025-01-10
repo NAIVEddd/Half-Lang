@@ -5,6 +5,14 @@
 #include"../IR/Builder.h"
 #include<stack>
 
+struct AS_String
+{
+    Temp::Label label;
+    std::string str;
+    AS_String(Temp::Label l, std::string s) : label(l), str(s) {}
+    AS_String(const AS_String& o) : str(o.str), label(o.label) {}
+};
+
 struct AS_StackAlloc
 {
     size_t bytes;
@@ -44,6 +52,26 @@ struct AS_Move
         : dst(o.dst), src(o.src) {}
     AS_Move(const Half_Ir_Name& d, const Half_Ir_Name& s)
         : dst(d.name), src(s.name) {}
+};
+
+struct AS_Move_String
+{
+    Temp::Label dst;
+    Temp::Label src;
+    AS_Move_String(Temp::Label d, Temp::Label s)
+        : dst(d), src(s) {}
+    AS_Move_String(const AS_Move_String& o)
+        : dst(o.dst), src(o.src) {}
+};
+
+struct AS_Move_Type
+{
+    Value dst;
+    Value src;
+    AS_Move_Type(Value d, Value s)
+        : dst(d), src(s) {}
+    AS_Move_Type(const AS_Move_Type& o)
+        : dst(o.dst), src(o.src) {}
 };
 
 struct AS_ElemPtr
@@ -170,7 +198,7 @@ struct AS_Return
     AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
-using AS_Instr = std::variant<std::monostate, AS_StackAlloc, AS_Oper, AS_Move, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_String, AS_StackAlloc, AS_Oper, AS_Move, AS_Move_String, AS_Move_Type, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
 struct AS_Function
 {

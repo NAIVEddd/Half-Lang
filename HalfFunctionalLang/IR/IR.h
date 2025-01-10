@@ -86,6 +86,18 @@ struct Register
 struct Value
 {
     // get label
+    Half_Type_Info GetType() const
+    {
+        if (std::holds_alternative<Address>(value))
+        {
+            return std::get<Address>(value).type;
+        }
+        else if (std::holds_alternative<Register>(value))
+        {
+            return std::get<Register>(value).type;
+        }
+        return Half_Type_Info::BasicType::BasicT::Invalid;
+    }
     Temp::Label GetLabel() const
     {
         if (std::holds_alternative<Address>(value))
@@ -97,6 +109,17 @@ struct Value
             return std::get<Register>(value).reg;
         }
         return Temp::Label("Value Invalid Label");
+    }
+    void SetLabel(Temp::Label l)
+    {
+        if (std::holds_alternative<Address>(value))
+        {
+            std::get<Address>(value).base = l;
+        }
+        else if (std::holds_alternative<Register>(value))
+        {
+            std::get<Register>(value).reg = l;
+        }
     }
 
     std::variant<Address, Register> value;
@@ -287,8 +310,13 @@ struct Half_Ir_Float
 struct Half_Ir_String
 {
     std::string str;
-    Half_Ir_String(std::string s) : str(s) {}
-    Half_Ir_String(const Half_Ir_String& s) : str(s.str) {}
+    Temp::Label label;
+    Half_Ir_String(std::string s, Temp::Label l = Temp::NewLabel()) : str(s), label(l) {}
+    Half_Ir_String(const Half_Ir_String& s) : str(s.str), label(s.label) {}
+    Value GetResult() const
+    {
+        return Value(Register{ Half_Type_Info::BasicType::BasicT::String, label });
+    }
 };
 
 struct Half_Ir_Name

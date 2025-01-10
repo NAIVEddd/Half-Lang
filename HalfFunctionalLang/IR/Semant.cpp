@@ -60,6 +60,34 @@ void Init_Basic_Type(std::shared_ptr<Table>& table)
     table->insert("string", std::make_shared<Half_Type_Info>(Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::String)));
 }
 
+Half_Type_Info Get_Expr_Type(std::shared_ptr<Table>& table, Half_Expr& expr)
+{
+    if (auto pval = std::get_if<std::shared_ptr<Half_Value>>(&expr.expr))
+    {
+        auto& val = **pval;
+        if (auto pconst = std::get_if<char>(&val.value))
+        {
+            return Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Char);
+        }
+        else if (auto pfloat = std::get_if<float>(&val.value))
+        {
+            return Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Float);
+        }
+        else if (auto pstr = std::get_if<std::string>(&val.value))
+        {
+            return Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::String);
+        }
+        else if (auto pint = std::get_if<int>(&val.value))
+        {
+            return Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Int);
+        }
+        _ASSERT(false);
+        return Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Int);
+    }
+    _ASSERT(false);
+    return Half_Type_Info();
+}
+
 std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl& type)
 {
     if (auto prename = std::get_if<Half_TypeDecl::RenameType>(&type.type))
@@ -434,6 +462,13 @@ Value Trans_Expr(Half_Expr& expr, Builder& builder)
     auto table = std::make_shared<Table>();
     Init_Basic_Type(table);
     auto value = Trans_Expr(table, builder, expr);
+
+    // move strings in table to builder
+    for (auto& [l,s] : table->strings)
+    {
+        builder.InsertString(l, s);
+    }
+
     return value;
 }
 
@@ -471,7 +506,9 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Let& let)
     else
     {
         // for now, default type is int
-        s.type = *table->findType("int").value();
+        // TODO: support other type
+        s.type = Get_Expr_Type(table, let.def.right);
+        //s.type = *table->findType("int").value();
     }
     
 
@@ -516,6 +553,26 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Value& va
         auto const_ir = Half_Ir_Const(*pint);
         builder.AddExp(const_ir);
         return const_ir.GetResult();
+    }
+    else if (auto pstr = std::get_if<std::string>(&value.value))
+    {
+        auto str_ir = Half_Ir_String(*pstr);
+        auto value_ir = Half_Ir_Value(str_ir);
+        builder.AddExp(value_ir);
+        table->insert(str_ir.label, *pstr);
+        return str_ir.GetResult();
+    }
+    else if (auto pchar = std::get_if<char>(&value.value))
+    {
+        auto const_ir = Half_Ir_Const(*pchar);
+        builder.AddExp(const_ir);
+        return const_ir.GetResult();
+    }
+    else if (auto pfloat = std::get_if<float>(&value.value))
+    {
+        /*auto const_ir = Half_Ir_Const(*pfloat);
+        builder.AddExp(const_ir);
+        return const_ir.GetResult();*/
     }
 
     // TODO: support other value type

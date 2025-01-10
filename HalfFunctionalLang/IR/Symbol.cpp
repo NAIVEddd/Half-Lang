@@ -10,6 +10,18 @@ Table::~Table()
     }
 }
 
+void Table::insert(Temp::Label l, std::string str)
+{
+    if (parent)
+    {
+        parent->insert(l, str);
+    }
+    else
+    {
+        strings.insert({ l, str });
+    }
+}
+
 void Table::insert(Symbol& s)
 {
     auto sz = s.type.GetSize();

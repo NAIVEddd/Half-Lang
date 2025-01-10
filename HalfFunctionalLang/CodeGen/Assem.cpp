@@ -12,6 +12,10 @@ void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs)
             MunchExp_llvmlike(exp, instrs);
         }
     }
+    for (auto& [f, s] : builder.strings)
+    {
+        instrs.push_back(AS_String(f, s));
+    }
 }
 
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
@@ -19,11 +23,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     if (auto pload = std::get_if<std::shared_ptr<Half_Ir_Load>>(&exp.exp))
     {
         printf("Half_Ir_Load:\n");
-        auto base_l = (*pload)->address.base.l;
-        auto reg = base_l == "bottom" ? "(%rsp)"
-            : (base_l == "top" ? "(%rbp)" : "(" + base_l + ")");
-        auto l = Temp::Label(std::to_string((*pload)->address.offset) + reg);
-        AS_Move move((*pload)->out_register.reg, l);
+        AS_Move_Type move((*pload)->out_register, (*pload)->address);
         instrs.push_back(move);
         return;
     }
@@ -34,29 +34,34 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         auto reg = base_l == "bottom" ? "(%rsp)"
             : (base_l == "top" ? "(%rbp)" : "(" + base_l + ")");
         auto l = Temp::Label(std::to_string((*pstore)->address.offset) + reg);
-        if (std::holds_alternative<Register>((*pstore)->value.value))
-        {
-            auto val = std::get<Register>((*pstore)->value.value);
-            AS_Move move(l, val.reg);
-            instrs.push_back(move);
-            return;
-        }
-        else if (std::holds_alternative<Address>((*pstore)->value.value))
-        {
-            /*auto& addr = std::get<Address>((*pstore)->value.value);
-            auto reg = addr.base.l == "bottom" ? "(%rsp)" : "(%rbp)";
-            auto l = Temp::Label(std::to_string(addr.offset) + reg);
-            AS_Move move(l, (*pstore)->in_register.reg);
-            instrs.push_back(move);*/
-            //return;
-        }
-        _ASSERT(false);
+        AS_Move_Type move((*pstore)->address, (*pstore)->value);
+        instrs.push_back(move);
+        return;
     }
     else if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&exp.exp))
     {
         auto t = (*pconst)->out_label;
         instrs.push_back(AS_Move(t, Temp::Label("$" + std::to_string((*pconst)->n))));
         return;
+    }
+    else if (auto pvalue = std::get_if<std::shared_ptr<Half_Ir_Value>>(&exp.exp))
+    {
+        auto v = (*pvalue)->val;
+        if (auto pstr = std::get_if<Half_Ir_String>(&v))
+        {
+            AS_Move_String move((*pvalue)->out_label, pstr->label);
+            instrs.push_back(move);
+        }
+        else if (auto pfloat = std::get_if<Half_Ir_Float>(&v))
+        {
+            _ASSERT(false);
+            //instrs.push_back(AS_Move((*pvalue)->out_label, Temp::Label("$" + std::to_string(pfloat->f))));
+        }
+        else
+        {
+            _ASSERT(false);
+            //instrs.push_back(AS_Move((*pvalue)->out_label, v));
+        }
     }
     else if (auto plabel = std::get_if<std::shared_ptr<Half_Ir_Label>>(&exp.exp))
     {
@@ -294,6 +299,10 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
 }
 
+inline std::string to_string(const AS_String& str)
+{
+    return str.label.l + ":\n\t.asciz \"" + str.str + "\"\n";
+}
 inline std::string to_string(const AS_StackAlloc& al)
 {
     auto push = std::string("pushq %rbp\n");
@@ -309,6 +318,127 @@ inline std::string to_string(const AS_Move& mv)
 {
     auto src = mv.src.l.starts_with('e') ? "%" + mv.src.l : mv.src.l;
     auto dst = mv.dst.l.starts_with('e') ? "%" + mv.dst.l : mv.dst.l;
+    return std::string("movl ") + src + ", " + dst + "\n";
+}
+inline std::string to_string(const AS_Move_String& mv)
+{
+    auto src = mv.src.l + "(%rip)";
+    std::string dst = mv.dst.l.starts_with('e') ? "%" + mv.dst.l : mv.dst.l;
+    if (mv.dst.l.starts_with('e'))
+    {
+        dst = mv.dst.l;
+        dst[0] = 'r';
+        dst = "%" + dst;
+    }
+    return std::string("leaq ") + src + ", " + dst + "\n";
+}
+inline std::string to_string(const AS_Move_Type& mv)
+{
+    std::string src, dst;
+    std::string inst;
+    // 1.move Register to Register
+    if (std::holds_alternative<Register>(mv.src.value) && std::holds_alternative<Register>(mv.dst.value))
+    {
+        src = std::get<Register>(mv.src.value).reg.l;
+        dst = std::get<Register>(mv.dst.value).reg.l;
+        auto src_type = mv.src.GetType();
+        auto dst_type = mv.dst.GetType();
+        if (src_type.is_pointer() || dst_type.is_pointer())
+        {
+            inst = "movq ";
+            if (src.starts_with('e') || dst.starts_with('e'))
+            {
+                src[0] = 'r';
+                dst[0] = 'r';
+            }
+            src = "%" + src;
+            dst = "%" + dst;
+            return inst + src + ", " + dst + "\n";
+        }
+        else if (src_type.is_basic() && dst_type.is_basic())
+        {
+            inst = "movl ";
+            src = "%" + src;
+            dst = "%" + dst;
+            return inst + src + ", " + dst + "\n";
+        }
+        else
+        {
+            _ASSERT(false);
+        }
+    }
+    // 2.move Register to Address
+    else if (std::holds_alternative<Register>(mv.src.value) && std::holds_alternative<Address>(mv.dst.value))
+    {
+        auto& addr = std::get<Address>(mv.dst.value);
+        auto val = std::get<Register>(mv.src.value);
+        auto val_type = mv.src.GetType();
+        if (val_type.GetSize() == 8)
+        {
+            inst = "movq ";
+            if (val.reg.l.starts_with('e'))
+            {
+                val.reg.l[0] = 'r';
+            }
+            src = "%" + val.reg.l;
+        }
+        else if (val_type.is_basic())
+        {
+            inst = "movl ";
+            src = "%" + val.reg.l;
+        }
+        else
+        {
+            _ASSERT(false);
+        }
+        auto reg = addr.base.l == "bottom" ? "(%rsp)" :
+            (addr.base.l == "top" ? "(%rbp)" : "(" + addr.base.l + ")");
+        dst = std::to_string(addr.offset) + reg;
+        return inst + src + ", " + dst + "\n";
+    }
+    // 3.move Address to Register
+    else if (std::holds_alternative<Register>(mv.dst.value) && std::holds_alternative<Address>(mv.src.value))
+    {
+        auto& addr = std::get<Address>(mv.src.value);
+        auto val = std::get<Register>(mv.dst.value);
+        if (val.type.GetSize() == 8)
+        {
+            inst = "movq ";
+            if (val.reg.l.starts_with('e'))
+            {
+                val.reg.l[0] = 'r';
+            }
+            dst = "%" + val.reg.l;
+        }
+        else if (val.type.is_basic())
+        {
+            inst = "movl ";
+            dst = "%" + val.reg.l;
+        }
+        else
+        {
+            _ASSERT(false);
+        }
+        // check if addr is a normal address
+        if (addr.base.l == "bottom" || addr.base.l == "top")
+        {
+            auto reg = addr.base.l == "bottom" ? "(%rsp)" : "(%rbp)";
+            src = std::to_string(addr.offset) + reg;
+            return inst + src + ", " + dst + "\n";
+        }
+        _ASSERT(false);
+        // not normal address, it's string address, so use rip relative addressing
+        auto reg = "(%rip)";
+        src = addr.base.l + reg;
+        return inst + src + ", " + dst + "\n";
+    }
+    // 4.move Address to Address (invalid instruction)
+    else
+    {
+        _ASSERT(false);
+    }
+    //auto src = mv.src.GetLabel().l.starts_with('e') ? "%" + mv.src.GetLabel().l : mv.src.GetLabel().l;
+    //auto dst = mv.dst.GetLabel().l.starts_with('e') ? "%" + mv.dst.GetLabel().l : mv.dst.GetLabel().l;
     return std::string("movl ") + src + ", " + dst + "\n";
 }
 inline std::string to_string(const AS_Lea& lea)
@@ -377,7 +507,11 @@ inline std::string to_string(const AS_Return& ret)
 
 std::string to_string(const AS_Instr& instr)
 {
-    if (auto palloc = std::get_if<AS_StackAlloc>(&instr))
+    if (auto pstr = std::get_if<AS_String>(&instr))
+    {
+        return to_string(*pstr);
+    }
+    else if (auto palloc = std::get_if<AS_StackAlloc>(&instr))
     {
         return to_string(*palloc);
     }
@@ -386,6 +520,14 @@ std::string to_string(const AS_Instr& instr)
         return to_string(*pop);
     }
     else if (auto pmv = std::get_if<AS_Move>(&instr))
+    {
+        return to_string(*pmv);
+    }
+    else if (auto pmv = std::get_if<AS_Move_String>(&instr))
+    {
+        return to_string(*pmv);
+    }
+    else if (auto pmv = std::get_if<AS_Move_Type>(&instr))
     {
         return to_string(*pmv);
     }

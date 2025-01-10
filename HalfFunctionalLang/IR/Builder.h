@@ -1,5 +1,6 @@
 #pragma once
 
+#include<map>
 #include"../Syntax/Base.h"
 #include"BasicBlock.h"
 
@@ -18,6 +19,7 @@
 struct Builder
 {
     std::vector<Half_Ir_BasicBlock> blocks;
+    std::map<Temp::Label, std::string> strings;
     size_t insert_point;
     size_t block_alloc_entry;
 
@@ -42,6 +44,11 @@ struct Builder
             return Temp::NewBlockLabel();
         }
         return Temp::Label(Temp::NewBlockLabel().l + "_" + postfix);
+    }
+
+    void InsertString(Temp::Label l, std::string str)
+    {
+        strings.insert({ l, str });
     }
 
     size_t NewBlock(std::string name = "")

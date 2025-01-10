@@ -261,7 +261,8 @@ ParserResult<Half_Funcall> pfuncall(ParserInput s)
 	{
 		return std::nullopt;
 	}
-	auto expr = BetweenPair('(', ')')(name.value().second);
+	auto pinline_expr = OnlyFirst(BetweenPair('(', ')'), space);
+	auto expr = pinline_expr(name.value().second);
 	if (!expr)
 	{
 		return std::nullopt;

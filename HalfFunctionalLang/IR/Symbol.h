@@ -102,6 +102,8 @@ struct Table
         return t->parent;
     }
 
+    void insert(Temp::Label l, std::string str);
+
     void insert(Symbol& s);
     void insert(FunctionSymbol f)
     {
@@ -120,6 +122,7 @@ struct Table
     size_t total_size = 0;
     std::map<std::string, Symbol> values;
     std::map<std::string, FunctionSymbol> funcs;
+    std::map<Temp::Label, std::string> strings;
     //std::map<std::string, Temp::Label> labels;
     std::map<std::string, std::shared_ptr<Half_Type_Info>> types;
 };

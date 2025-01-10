@@ -13,7 +13,7 @@ size_t GetSize(Half_Type_Info::BasicType& type)
     case BasicT::Float:
         return sizeof(float);
     case BasicT::String:
-        return sizeof(std::string);
+        return sizeof(char*);
     default:
         break;
     }
@@ -59,6 +59,16 @@ size_t GetSize(Half_Type_Info::StructType& type)
 size_t GetSize(Half_Type_Info::FuncType& type)
 {
     return sizeof(void*);
+}
+
+bool Half_Type_Info::is_pointer() const
+{
+    return std::holds_alternative<Half_Type_Info::PointerType>(type);
+}
+
+bool Half_Type_Info::is_basic() const
+{
+    return std::holds_alternative<Half_Type_Info::BasicType>(type);
 }
 
 size_t Half_Type_Info::GetSize()
