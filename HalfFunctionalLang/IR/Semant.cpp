@@ -84,6 +84,55 @@ Half_Type_Info Get_Expr_Type(std::shared_ptr<Table>& table, Half_Expr& expr)
         _ASSERT(false);
         return Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Int);
     }
+    else if (auto pvar = std::get_if<std::shared_ptr<Half_Var>>(&expr.expr))
+    {
+        auto& var = **pvar;
+        auto opt_sym = table->find(var.name());
+        if (!opt_sym)
+        {
+            printf("Symbol not found: %s\n", var.name().c_str());
+            // TODO: error message and interrupt the compilation
+            _ASSERT(false);
+        }
+        if (auto psimple = std::get_if<Half_Var::SimpleVar>(&var.var))
+        {
+            return opt_sym.value().type;
+        }
+        else if (auto pfield = std::get_if<Half_Var::FieldVar>(&var.var))
+        {
+            auto& field = *pfield;
+            auto& sym = opt_sym.value();
+            auto& type = sym.type;
+            if (auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&type.type))
+            {
+                auto& struct_ty = *pstruct_ty;
+                auto& struct_field = struct_ty.GetField(field.id);
+                return *struct_field.type;
+            }
+            _ASSERT(false);
+            return {};
+        }
+        if (auto psubscript = std::get_if<Half_Var::SubscriptVar>(&var.var))
+        {
+            auto& subfield = *psubscript;
+            auto& sym = opt_sym.value();
+            auto& type = sym.type;
+            if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&type.type))
+            {
+                return *parray_ty->type;
+            }
+            else if (auto parray_ty = std::get_if<Half_Type_Info::PointerType>(&type.type))
+            {
+                auto& ty = *parray_ty->type;
+                return ty.type;
+            }
+            // TODO: not array type, error message
+            _ASSERT(false);
+            return {};
+        }
+        _ASSERT(false);
+        return {};
+    }
     _ASSERT(false);
     return Half_Type_Info();
 }
@@ -133,7 +182,7 @@ std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_T
             printf("Type not found: %s\n", ptype->type_name.c_str());
             _ASSERT(false);
         }
-        auto arr = Half_Type_Info::ArrayType(opt_ty.value(), 0);
+        auto arr = Half_Type_Info::PointerType(opt_ty.value());
         return std::make_shared<Half_Type_Info>(arr);
     }
     else if (auto ptype = std::get_if<Half_TypeDecl::ArrayType>(&type.type))
@@ -207,22 +256,28 @@ Address Trans_GetElementPtr(std::shared_ptr<Table>& table, Half_Ir_GetElementPtr
         // check if it is a pointer
         if (auto pptr_ty = std::get_if<Half_Type_Info::PointerType>(&type.type))
         {
+            auto elem_type = pptr_ty->type;
             if (auto pconst = std::get_if<Half_Ir_Const>(&idx))
             {
                 auto n = pconst->n;
-                auto sz = type.GetSize();
+                auto sz = elem_type->GetSize();
                 ptr.offset += n * sz;
             }
             else if (auto pvar = std::get_if<Value>(&idx))
             {
-                auto sz = (int)type.GetSize();
+                auto sz = (int)elem_type->GetSize();
                 Half_Ir_Const ty_sz(sz);
-                Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, ty_sz.GetResult().GetLabel(), pvar->GetLabel(), Temp::NewLabel());
-                // bug, should use 'leaq offset(base), out'
-                Half_Ir_FetchPtr fetch(Address{ type, ptr.base, ptr.offset });
-                Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, binop.GetResult().GetLabel(), fetch.GetResult().GetLabel(), Temp::NewLabel());
+                auto ty_sz_res = ty_sz.GetResult();
+                Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, std::get<Register>(ty_sz_res.value), std::get<Register>(pvar->value), Temp::NewLabel());
+                Half_Ir_FetchPtr fetch(Address{ elem_type, ptr.base, ptr.offset });
+                auto binop_res = binop.GetResult();
+                Half_Ir_Ext ext(std::get<Register>(binop_res.value), binop_res.GetType(), Temp::NewLabel());
+                auto ext_res = ext.GetResult();
+                auto fetch_res = fetch.GetResult();
+                Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, std::get<Register>(ext_res.value), std::get<Register>(fetch_res.value), Temp::NewLabel());
                 builder.AddExp(ty_sz);
                 builder.AddExp(binop);
+                builder.AddExp(ext);
                 builder.AddExp(fetch);
                 builder.AddExp(binop2);
                 ptr.base = binop2.GetResult().GetLabel();
@@ -249,12 +304,18 @@ Address Trans_GetElementPtr(std::shared_ptr<Table>& table, Half_Ir_GetElementPtr
             if (auto pvar = std::get_if<Value>(&idx))
             {
                 Half_Ir_Const ty_sz(sz);
-                Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, ty_sz.GetResult().GetLabel(), pvar->GetLabel(), Temp::NewLabel());
-                // bug: should use 'leaq offset(base), out_label'
-                Half_Ir_FetchPtr fetch(Address{ type, ptr.base, ptr.offset });
-                Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, binop.GetResult().GetLabel(), fetch.GetResult().GetLabel(), Temp::NewLabel());
+                auto ty_sz_res = ty_sz.GetResult();
+                Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, std::get<Register>(ty_sz_res.value), std::get<Register>(pvar->value), Temp::NewLabel());
+                Half_Ir_FetchPtr fetch(Address{ parray_ty->type, ptr.base, ptr.offset });
+                auto binop_res = binop.GetResult();
+                Half_Ir_Ext ext(std::get<Register>(binop_res.value), binop_res.GetType(), Temp::NewLabel());
+                auto ext_res = ext.GetResult();
+                auto fetch_res = fetch.GetResult();
+                Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, std::get<Register>(ext_res.value), std::get<Register>(fetch_res.value), Temp::NewLabel());
+                //Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, binop.GetResult().GetLabel(), fetch.GetResult().GetLabel(), Temp::NewLabel());
                 builder.AddExp(ty_sz);
                 builder.AddExp(binop);
+                builder.AddExp(ext);
                 builder.AddExp(fetch);
                 builder.AddExp(binop2);
                 ptr.base = binop2.GetResult().GetLabel();
@@ -277,6 +338,12 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
     }
     if (auto psimple = std::get_if<Half_Var::SimpleVar>(&var.var))
     {
+        if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
+        {
+            Half_Ir_Load load(symbol.value().addr);
+            builder.AddExp(load);
+            return Half_Ir_GetElementPtr(load.out_register);
+        }
         auto offset = symbol.value().offset;
         Half_Ir_GetElementPtr gep(symbol.value().addr);
         gep.in_indexs.push_back(Half_Ir_Const(0));
@@ -325,6 +392,11 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
             get_ptr.result_element_type = parray_ty->type;
             return get_ptr;
         }
+        else if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
+        {
+            get_ptr.result_element_type = *pptr->type;
+            return get_ptr;
+        }
         get_ptr.result_element_type = Half_Type_Info::BasicType::BasicT::Invalid;
         return get_ptr;
     }
@@ -335,26 +407,26 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Var& var);
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Value& value);
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Funcall& funcall);
-Half_Ir_Name Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builder& builder);
-Half_Ir_Name Trans_OpExpr_Builder(std::shared_ptr<Table>& table, Half_Op::Half_OpExpr& op, Builder& builder)
+Value Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builder& builder);
+Value Trans_OpExpr_Builder(std::shared_ptr<Table>& table, Half_Op::Half_OpExpr& op, Builder& builder)
 {
     if (auto pvar = std::get_if<Half_Var>(&op))
     {
         auto& var = *pvar;
         auto addr = Trans_Expr(table, builder, var);
-        return addr.GetLabel();
+        return addr;
     }
     else if (auto pvalue = std::get_if<Half_Value>(&op))
     {
         auto& value = *pvalue;
         auto res = Trans_Expr(table, builder, value);
-        return res.GetLabel();
+        return res;
     }
     else if (auto pfuncall = std::get_if<Half_Funcall>(&op))
     {
         auto& funcall = *pfuncall;
         auto res = Trans_Expr(table, builder, funcall);
-        return res.GetLabel();
+        return res;
     }
     else if (auto pop = std::get_if<Half_Op>(&op))
     {
@@ -363,18 +435,32 @@ Half_Ir_Name Trans_OpExpr_Builder(std::shared_ptr<Table>& table, Half_Op::Half_O
     }
 
     _ASSERT(false);
-    return Half_Ir_Name();
+    return Register{};
 }
 
-Half_Ir_Name Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builder& builder)
+Value Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builder& builder)
 {
     auto l = Trans_OpExpr_Builder(table, *op.left, builder);
     auto r = Trans_OpExpr_Builder(table, *op.right, builder);
 
-    auto op_ir = Half_Ir_BinOp(op.op, l, r, Temp::NewLabel());
+    auto op_ir = Half_Ir_BinOp(op.op, std::get<Register>(l.value), std::get<Register>(r.value), Temp::NewLabel());
     builder.AddExp(op_ir);
 
-    return op_ir.out_label;
+    Half_Type_Info type = Half_Type_Info::BasicType::BasicT::Int;
+
+
+    auto res = op_ir.GetResult();
+    if (auto preg = std::get_if<Register>(&res.value))
+    {
+        preg->type = type;
+    }
+    else if (auto paddr = std::get_if<Address>(&res.value))
+    {
+        // impossible
+        _ASSERT(false);
+        paddr->type = type;
+    }
+    return res;
 }
 
 Half_Ir_Name Trans_CondOp(std::shared_ptr<Table>& table, Builder& builder, Half_Op::Half_OpExpr& op, std::string prefix, Temp::Label true_label, Temp::Label false_label)
@@ -602,8 +688,8 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_StructIni
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Op& op)
 {
-    auto label = Trans_Op_Builder(table, op, builder);
-    return Register{{}, label.name};
+    auto op_val = Trans_Op_Builder(table, op, builder);
+    return op_val;
 }
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Assign& assign)
@@ -746,7 +832,9 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_FuncDecl&
         smb.name = funcDecl.parameters[i].var_name;
         smb.type = *(table->findType(funcDecl.parameters[i].type_name).value());
         funcscope->insert(smb);
-        Address addr{ smb.type, Temp::Label("bottom"), smb.offset };
+        func_ir.args_size.push_back(smb.type.GetSize());
+
+        Address addr = smb.addr;
         auto alloc = Half_Ir_Alloca(addr);
         builder.AddExp(alloc_entry, alloc);
     }
@@ -755,6 +843,8 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_FuncDecl&
     auto last_val = Trans_Expr(funcscope, builder, funcDecl.body);
     Half_Ir_Return ret(last_val);
     builder.AddExp(ret);
+    // 4.1 set func needed stack size
+    func_ir.stack_size = funcscope->stack->max_size;
 
     // 5. Move all blocks in builder to function ir
     func_ir.alloc = builder.blocks[alloc_entry];

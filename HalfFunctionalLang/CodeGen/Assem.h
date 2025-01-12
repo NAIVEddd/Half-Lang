@@ -22,13 +22,24 @@ struct AS_StackAlloc
 
 struct AS_Oper
 {
+    size_t sz;
     std::string assem;
     Temp::Label dst;
     Temp::Label src;
     AS_Oper(std::string as, Temp::Label d, Temp::Label s)
-        : assem(as), dst(d), src(s) {}
+        : sz(0), assem(as), dst(d), src(s) {}
     AS_Oper(const AS_Oper& o)
-        : assem(o.assem), dst(o.dst), src(o.src) {}
+        : sz(o.sz), assem(o.assem), dst(o.dst), src(o.src) {}
+};
+
+struct AS_Ext
+{
+    Temp::Label dst;
+    Temp::Label src;
+    AS_Ext(Temp::Label d, Temp::Label s)
+        : dst(d), src(s) {}
+    AS_Ext(const AS_Ext& o)
+        : dst(o.dst), src(o.src) {}
 };
 
 struct AS_Lea
@@ -44,14 +55,15 @@ struct AS_Lea
 
 struct AS_Move
 {
+    size_t sz;
     Temp::Label dst;
     Temp::Label src;
     AS_Move(Temp::Label d, Temp::Label s)
-        : dst(d), src(s) {}
+        : sz(0), dst(d), src(s) {}
     AS_Move(const AS_Move& o)
-        : dst(o.dst), src(o.src) {}
+        : sz(o.sz), dst(o.dst), src(o.src) {}
     AS_Move(const Half_Ir_Name& d, const Half_Ir_Name& s)
-        : dst(d.name), src(s.name) {}
+        : sz(0), dst(d.name), src(s.name) {}
 };
 
 struct AS_Move_String
@@ -198,7 +210,7 @@ struct AS_Return
     AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
-using AS_Instr = std::variant<std::monostate, AS_String, AS_StackAlloc, AS_Oper, AS_Move, AS_Move_String, AS_Move_Type, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_String, AS_StackAlloc, AS_Oper, AS_Ext, AS_Move, AS_Move_String, AS_Move_Type, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
 struct AS_Function
 {

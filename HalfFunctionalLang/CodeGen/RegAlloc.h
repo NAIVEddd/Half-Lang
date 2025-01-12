@@ -55,6 +55,13 @@ struct RegAlloc
                 pop->src = src;
                 pop->dst = dst;
             }
+            else if (auto pext = std::get_if<AS_Ext>(&instr))
+            {
+                auto src = tempMap.find(pext->src) == -1 ? pext->src : Temp::Label(regNames[color.color[tempMap.get(pext->src)]]);
+                auto dst = tempMap.find(pext->dst) == -1 ? pext->dst : Temp::Label(regNames[color.color[tempMap.get(pext->dst)]]);
+                pext->src = src;
+                pext->dst = dst;
+            }
             else if (auto pmv = std::get_if<AS_Move>(&instr))
             {
                 auto src = tempMap.find(pmv->src) == -1 ? pmv->src : Temp::Label(regNames[color.color[tempMap.get(pmv->src)]]);

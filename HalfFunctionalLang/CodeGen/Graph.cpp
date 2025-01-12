@@ -40,6 +40,10 @@ std::vector<Temp::Label> Node::Def() const
     {
         labels.push_back(pop->dst);
     }
+    else if (auto pext = std::get_if<AS_Ext>(&info))
+    {
+        labels.push_back(pext->dst);
+    }
     else if (auto pmv = std::get_if<AS_Move>(&info))
     {
         labels.push_back(pmv->dst);
@@ -100,6 +104,10 @@ std::vector<Temp::Label> Node::Use() const
     {
         labels.push_back(pop->src);
         labels.push_back(pop->dst);
+    }
+    else if (auto pext = std::get_if<AS_Ext>(&info))
+    {
+        labels.push_back(pext->src);
     }
     else if (auto pmv = std::get_if<AS_Move>(&info))
     {

@@ -38,6 +38,12 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         instrs.push_back(move);
         return;
     }
+    else if (auto pext = std::get_if<std::shared_ptr<Half_Ir_Ext>>(&exp.exp))
+    {
+        AS_Ext ext((*pext)->out_label, (*pext)->value.GetLabel());
+        instrs.push_back(ext);
+        return;
+    }
     else if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&exp.exp))
     {
         auto t = (*pconst)->out_label;
@@ -76,14 +82,18 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         instrs.push_back(AS_Label((*pfunc)->name));
 
         // 1. allocs stack space (according to the number of parameters)
-        auto stack_size = ((*pfunc)->alloc.exps.size() + 1) * 4;
+        auto stack_size = (*pfunc)->stack_size;
         instrs.push_back(AS_StackAlloc(stack_size));
 
         // 1.5 store parameters from registers to stack
         auto regs = std::vector<std::string>{  "ecx","edx", "r8d", "r9d" };
+        size_t offset = 0;
         for (size_t i = 0; i < (*pfunc)->args.size() && i < regs.size(); ++i)
         {
-            instrs.push_back(AS_Move(Temp::Label(std::to_string(i * 4) + "(%rsp)"), Temp::Label(regs[i])));
+            AS_Move move(Temp::Label(std::to_string(offset) + "(%rsp)"), Temp::Label(regs[i]));
+            move.sz = (*pfunc)->args_size[i];
+            instrs.push_back(move);
+            offset += (*pfunc)->args_size[i];
         }
 
         // 2. map func blocks with label and index
@@ -199,8 +209,8 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     {
         auto& binop = **pop;
         printf("Half_Ir_Op\n");
-        auto movl = binop.left.name;
-        auto movr = binop.right.name;
+        auto movl = binop.left.reg;
+        auto movr = binop.right.reg;
         auto tostring = [](Half_Ir_BinOp::Oper op)
             {
                 switch (op)
@@ -224,8 +234,13 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
                 }
                 return std::string();
             };
-        instrs.push_back(AS_Oper(tostring((*pop)->op), movl, movr));
-        instrs.push_back(AS_Move(binop.out_label, movl));
+        AS_Oper oper(tostring((*pop)->op), movr, movl);
+        binop.left.type.GetSize() == 8 ? oper.sz = 8 : oper.sz = 4;
+        binop.right.type.GetSize() == 8 ? oper.sz = 8 : oper.sz = 4;
+        instrs.push_back(oper);
+        AS_Move_Type move((*pop)->GetResult(), (*pop)->right);
+        //AS_Move move(binop.out_label, movr);
+        instrs.push_back(move);
         return;
     }
     else if (auto pcall = std::get_if<std::shared_ptr<Half_Ir_Call>>(&exp.exp))
@@ -310,14 +325,67 @@ inline std::string to_string(const AS_StackAlloc& al)
 }
 inline std::string to_string(const AS_Oper& op)
 {
+    std::string inst;
+    if (op.sz == 8)
+    {
+        inst = op.assem + "q ";
+        std::string src = op.src.l;
+        if (op.src.l.starts_with('e'))
+        {
+            src[0] = 'r';
+            src = "%" + src;
+        }
+        std::string dst = op.dst.l;
+        if (op.dst.l.starts_with('e'))
+        {
+            dst[0] = 'r';
+            dst = "%" + dst;
+        }
+        return inst + src + ", " + dst + "\n";
+    }
     auto src = op.src.l.starts_with('e') ? "%" + op.src.l : op.src.l;
     auto dst = op.dst.l.starts_with('e') ? "%" + op.dst.l : op.dst.l;
     return op.assem + "l " + src + ", " + dst + "\n";
 }
+inline std::string to_string(const AS_Ext& ext)
+{
+    auto src = ext.src.l.starts_with('e') ? "%" + ext.src.l : ext.src.l;
+    std::string dst = ext.dst.l;
+    if (ext.dst.l.starts_with('e'))
+    {
+        dst[0] = 'r';
+        dst = "%" + dst;
+    }
+    return "movslq " + src + ", " + dst + "\n";
+}
 inline std::string to_string(const AS_Move& mv)
 {
-    auto src = mv.src.l.starts_with('e') ? "%" + mv.src.l : mv.src.l;
-    auto dst = mv.dst.l.starts_with('e') ? "%" + mv.dst.l : mv.dst.l;
+    if (mv.src.l == mv.dst.l)
+    {
+        //TODO: remove this, it's a hack
+        // munch exp-binop add one instr with same src and dst
+        return "; --- ;";
+    }
+    std::string inst;
+    if (mv.sz == 8)
+    {
+        inst = "movq ";
+        std::string src = mv.src.l;
+        if (mv.src.l.starts_with('e') || mv.src.l.starts_with('r'))
+        {
+            src[0] = 'r';
+            src = "%" + src;
+        }
+        std::string dst = mv.dst.l;
+        if (mv.dst.l.starts_with('e') || mv.dst.l.starts_with('r'))
+        {
+            dst[0] = 'r';
+            dst = "%" + dst;
+        }
+        return inst + src + ", " + dst + "\n";
+    }
+    auto src = mv.src.l.starts_with('e') || mv.src.l.starts_with('r') ? "%" + mv.src.l : mv.src.l;
+    auto dst = mv.dst.l.starts_with('e') || mv.dst.l.starts_with('r') ? "%" + mv.dst.l : mv.dst.l;
     return std::string("movl ") + src + ", " + dst + "\n";
 }
 inline std::string to_string(const AS_Move_String& mv)
@@ -391,8 +459,13 @@ inline std::string to_string(const AS_Move_Type& mv)
         {
             _ASSERT(false);
         }
-        auto reg = addr.base.l == "bottom" ? "(%rsp)" :
-            (addr.base.l == "top" ? "(%rbp)" : "(" + addr.base.l + ")");
+        auto reg = addr.base.l == "bottom" ? "rsp" :
+            (addr.base.l == "top" ? "rbp" : addr.base.l);
+        if (reg.starts_with('e'))
+        {
+            reg[0] = 'r';
+        }
+        reg = "(%" + reg + ")";
         dst = std::to_string(addr.offset) + reg;
         return inst + src + ", " + dst + "\n";
     }
@@ -426,10 +499,13 @@ inline std::string to_string(const AS_Move_Type& mv)
             src = std::to_string(addr.offset) + reg;
             return inst + src + ", " + dst + "\n";
         }
-        _ASSERT(false);
-        // not normal address, it's string address, so use rip relative addressing
-        auto reg = "(%rip)";
-        src = addr.base.l + reg;
+        // not normal address, it's calculated address
+        auto reg = addr.base.l;
+        if (reg.starts_with('e'))
+        {
+            reg[0] = 'r';
+        }
+        src = "(%" + reg + ")";
         return inst + src + ", " + dst + "\n";
     }
     // 4.move Address to Address (invalid instruction)
@@ -443,8 +519,18 @@ inline std::string to_string(const AS_Move_Type& mv)
 }
 inline std::string to_string(const AS_Lea& lea)
 {
-    auto src = lea.src.l.starts_with('e') ? "%" + lea.src.l : lea.src.l;
-    auto dst = lea.dst.l.starts_with('e') ? "%" + lea.dst.l : lea.dst.l;
+    auto src = lea.src.l;
+    if (src.starts_with('e') || src.starts_with('r'))
+    {
+        src[0] = 'r';
+        src = "%" + src;
+    }
+    std::string dst = lea.dst.l;
+    if (dst.starts_with('e') || dst.starts_with('r'))
+    {
+        dst[0] = 'r';
+        dst = "%" + dst;
+    }
     return std::string("leaq ") + std::to_string(lea.offset) + "(" + src + "), " + dst + "\n";
 }
 inline std::string to_string(const AS_ElemPtr& mv)
@@ -518,6 +604,10 @@ std::string to_string(const AS_Instr& instr)
     else if (auto pop = std::get_if<AS_Oper>(&instr))
     {
         return to_string(*pop);
+    }
+    else if (auto pext = std::get_if<AS_Ext>(&instr))
+    {
+        return to_string(*pext);
     }
     else if (auto pmv = std::get_if<AS_Move>(&instr))
     {

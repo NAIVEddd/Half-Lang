@@ -12,6 +12,7 @@ struct Half_Ir_Stm;
 struct Half_Ir_Alloca;
 struct Half_Ir_Load;
 struct Half_Ir_Store;
+struct Half_Ir_Ext;
 struct Half_Ir_Const;
 struct Half_Ir_Float;
 struct Half_Ir_String;
@@ -38,6 +39,7 @@ struct Half_Ir_Exp
         std::shared_ptr<Half_Ir_Alloca>,
         std::shared_ptr<Half_Ir_Load>,
         std::shared_ptr<Half_Ir_Store>,
+        std::shared_ptr<Half_Ir_Ext>,
         std::shared_ptr<Half_Ir_Const>,
         std::shared_ptr<Half_Ir_GetElementPtr>,
         std::shared_ptr<Half_Ir_FetchPtr>,
@@ -73,7 +75,7 @@ enum class Half_AddressSpace
 
 struct Address
 {   // format as offset(base)
-    Half_Type_Info type;
+    Half_Type_Info type;    // TODO : is this a element type or a pointer type
     Temp::Label base;
     ptrdiff_t offset;
 };
@@ -162,6 +164,21 @@ struct Half_Ir_Store
     Half_Ir_Store(Value v, Address a) : value(v), address(a) {}
 };
 
+// extend value to a larger size
+struct Half_Ir_Ext
+{
+    Value value;
+    Half_Type_Info type;
+    Temp::Label out_label;
+    Half_Ir_Ext(Value v, Half_Type_Info t, Temp::Label l = Temp::NewLabel())
+        : value(v), type(t), out_label(l) {}
+    Half_Ir_Ext(const Half_Ir_Ext& e) : value(e.value), type(e.type), out_label(e.out_label) {}
+    Value GetResult() const
+    {
+        return Value(Register{ type, out_label });
+    }
+};
+
 // struct Half_Ir_GetElementPtr
 // {
 //     Type PointeeType;
@@ -204,6 +221,12 @@ struct Half_Ir_GetElementPtr
     Half_Ir_GetElementPtr(Address a, Temp::Label l = Temp::NewLabel())
         : offset(a.offset), base(a.base), out_label(l)
         , source_element_type(Half_Type_Info::PointerType(a.type))
+    {
+        result_element_type = source_element_type;
+    }
+    Half_Ir_GetElementPtr(Register reg, Temp::Label l = Temp::NewLabel())
+        : offset(0), base(reg.reg), out_label(l)
+        , source_element_type(reg.type)
     {
         result_element_type = source_element_type;
     }
@@ -292,12 +315,14 @@ struct Half_Ir_Function
     std::string name;
     Half_TypeDecl::FuncType type;
     std::vector<Half_FuncDecl::TypeField> args;
+    std::vector<size_t> args_size;
+    size_t stack_size;
 
     Half_Ir_BasicBlock alloc;
     std::vector<Half_Ir_BasicBlock> blocks;
     Half_Ir_Function() = default;
-    Half_Ir_Function(std::string n, Half_TypeDecl::FuncType t, std::vector<Half_FuncDecl::TypeField>& a)
-        : name(n), type(t), args(a) {}
+    Half_Ir_Function(std::string n, Half_TypeDecl::FuncType t, std::vector<Half_FuncDecl::TypeField>& a, std::vector<size_t>& szs, size_t sz)
+        : name(n), type(t), args(a), args_size(szs), stack_size(sz) {}
 };
 
 struct Half_Ir_Float
@@ -350,18 +375,34 @@ struct Half_Ir_BinOp
         Equal, NotEqual
     };
     Oper op;
-    Half_Ir_Name left;
-    Half_Ir_Name right;
+    Register left;
+    Register right;
     Temp::Label out_label;
-    Half_Ir_BinOp(std::string o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+    Half_Ir_BinOp(std::string o, Register l, Register r, Temp::Label out)
         : op(GetOper(o)), left(l), right(r), out_label(out) {}
-    Half_Ir_BinOp(Oper o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+    Half_Ir_BinOp(Oper o, Register l, Register r, Temp::Label out)
         : op(o), left(l), right(r), out_label(out) {}
     Half_Ir_BinOp(const Half_Ir_BinOp& o)
         : op(o.op), left(o.left), right(o.right), out_label(o.out_label) {}
     
     Value GetResult() const
     {
+        if (left.type.is_pointer() && right.type.is_basic())
+        {
+            return Value(Register{ left.type, out_label });
+            //return Value(Address{ left.type, left.reg, 0 });
+        }
+        else if (left.type.is_basic() && right.type.is_pointer())
+        {
+            return Value(Register{ right.type, out_label });
+            //return Value(Address{ right.type, right.reg, 0 });
+        }
+        else if (left.type.is_basic() && right.type.is_basic())
+        {
+            return Value(Register{ Half_Type_Info::BasicType::BasicT::Int, out_label });
+        }
+        // wrong type, error message and interrupt
+        _ASSERT(false);
         return Value(Register{ Half_Type_Info::BasicType::BasicT::Int, out_label });
     }
     
