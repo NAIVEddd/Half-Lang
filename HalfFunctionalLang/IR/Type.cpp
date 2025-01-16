@@ -17,8 +17,10 @@ size_t GetSize(Half_Type_Info::BasicType& type)
     default:
         break;
     }
-    _ASSERT(false);
-    return 0;
+    // TODO: other type
+    //_ASSERT(false);
+    //return 0;
+    return 4;
 }
 
 size_t GetSize(Half_Type_Info::PointerType& type)

@@ -40,6 +40,62 @@ void Color::initialize(Liveness& liveness)
     }
 }
 
+void Color::initialize(Liveness_Graph& l)
+{
+    liveness = l;
+}
+
+void Color::precolored(std::map<Temp::Label, int>& colored)
+{
+    precolor = colored;
+}
+
+std::map<Temp::Label, int> Color::AllocateRegisters()
+{
+    std::map<Temp::Label, int> registerMap;
+    registerMap = precolor;
+    for (size_t i = 0; i < liveness.blocks.size(); ++i)
+    {
+        std::map<Temp::Label, std::set<Temp::Label>> interferenceGraph;
+        liveness.GetBlockInterferenceGraph(i, interferenceGraph);
+        for (const auto& graph : interferenceGraph)
+        {
+            const auto& var = graph.first;
+            const auto& neighbors = graph.second;
+
+            if (registerMap.find(var) != registerMap.end())
+            {
+                continue;
+            }
+
+            std::set<int> usedRegisters;
+            for (const auto& neighbor : neighbors)
+            {
+                if (registerMap.find(neighbor) != registerMap.end())
+                {
+                    usedRegisters.insert(registerMap[neighbor]);
+                }
+            }
+            bool found = false;
+            for (int i = 0; i < numRegisters; ++i)
+            {
+                if (usedRegisters.find(i) == usedRegisters.end())
+                {
+                    registerMap[var] = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                printf("Error: No available register for variable %s\n", var.l.c_str());
+            }
+        }
+    }
+    
+    return registerMap;
+}
+
 void Color::simplify()
 {
     for (size_t i = 0; i < adjList.size(); i++)

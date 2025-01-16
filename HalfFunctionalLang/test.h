@@ -1048,42 +1048,78 @@ function main() : int =
     0
 end)";
 
-    std::string prog11 =
+    std::string prog11_0 =
         R"(
 type int_array = array of int
+)";
 
+    std::string prog11_1 =
+        R"(
 function swap(arr int_array, i int, j int) : int =
     let t = arr[i]
     arr[i] = arr[j]
     arr[j] = t
     0
-end
+end)";
 
-function sort(arr int_array, low int, high int) : int =
-    if low >= high then
-        0
-    else
-        let i = low
-        let j = high
-        let base = arr[i]
-        while i < j do
-            while i < j && arr[j] >= base do
-                j = j - 1
-            end
-            swap(arr, i, j)
-            while i < j && arr[i] <= base do
-                i = i + 1
-            end
-            swap(arr, i, j)
+    std::string prog11_2 = 
+        R"(
+function partition(arr int_array, low int, high int) : int =
+    let pivot = arr[low]
+    let i = low
+    let j = high
+    while i < j do
+        while i < j && arr[j] >= pivot do
+            j = j - 1
         end
-        sort(arr, low, i)
-        sort(arr, i + 1, high)
+        if i < j then
+            arr[i] = arr[j]
+            i = i + 1
+        else
+            0
+        end
+        while i < j && arr[i] <= pivot do
+            i = i + 1
+        end
+        if i < j then
+            arr[j] = arr[i]
+            j = j - 1
+        else
+            0
+        end
     end
-end
+    arr[i] = pivot
+    i
+end)";
+
+    std::string prog11_3 =
+        R"(
+function sort(arr int_array, low int, high int) : int =
+    print_int_int(low, high)
+    if low < high then
+        let pivotIndex = partition(arr, low, high)
+        sort(arr, low, pivotIndex - 1)
+        sort(arr, pivotIndex + 1, high)
+        1
+    else
+        2
+    end
+end)";
+
+    std::string prog11 = prog11_0 + prog11_1 + prog11_2 + prog11_3 +
+        R"(
 type int_10 = array of int[11]
 function main() : int =
     let arr = int_10 [[3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 7]]
     sort(arr, 0, 10)
+end)";
+
+    std::string prog12 =
+        R"(
+function main() : int =
+    let str = "hello world"
+    print(str)
+    0
 end)";
 
     /* {
@@ -1418,7 +1454,8 @@ end)";
         {   // test for code gen
             Builder b;
             auto check = TypeCheck();
-            auto e = pprogram(prog9);
+            auto e = pprogram(prog11_0 + prog11_2 + prog11_3);
+            //auto e = pprogram(prog11);
             _ASSERT(e.value().second.empty());
             if (check.Check(e.value().first))
             {
@@ -1426,35 +1463,66 @@ end)";
             }
             std::vector<AS_Instr> instrs;
 
-            auto ir_name = Trans_Expr(e.value().first, b, 0);
+            auto ir_name = Trans_Expr(e.value().first, b);
             printf("\nbuilder exprs count: %zd\n", b.blocks[0].exps.size());
             
-            //printf("\n%s\n", to_string(ir_name.name).c_str());
-            
-            MunchExps_llvmlike(b, instrs);
-
-            printf("\nCount %zd\n", instrs.size());
-            for (size_t i = 0; i < instrs.size(); i++)
+            for (auto& block : b.blocks)
             {
-                printf("%s", to_string(instrs[i]).c_str());
+                for (auto& exp : block.exps)
+                {
+                    printf("exp index: %zd\n", exp.exp.index());
+                    if (auto pfunc = std::get_if<std::shared_ptr<Half_Ir_Function>>(&exp.exp))
+                    {
+                        printf("func name: %s\n", (*pfunc)->name.c_str());
+                        for (auto& block : (*pfunc)->blocks)
+                        {
+                            printf("    block name: %s\n", block.label.l.c_str());
+                            for (auto i : block.preds)
+                            {
+                                printf("        pred: %s\n", (*pfunc)->blocks[i].label.l.c_str());
+                            }
+                            for (auto i : block.succs)
+                            {
+                                printf("        succ: %s\n", (*pfunc)->blocks[i].label.l.c_str());
+                            }
+                        }
+                    }
+                }
             }
-            auto g = Graph();
-            g.initialize(instrs);
-            auto live = Liveness();
-            live.initialize(g);
-            printf("\nCount %zd\n", g.Nodes.size());
-            auto rlive = Liveness();
-            rlive.rinitialize(g);
-            live == rlive;
-            Color color(8);
-            color.initialize(live);
-            color.allocate();
-            color.print();
-            RegAlloc regalloc;
-            regalloc.allocate(g, live);
-            for (size_t i = 0; i < g.instrs.size(); i++)
+
+            for (auto idx = 0; idx < b.blocks[0].exps.size(); ++idx)
             {
-                printf("%s", to_string(g.instrs[i]).c_str());
+                std::vector<AS_Block> blocks;
+                MunchExp_llvmlike(b.blocks[0].exps[idx], blocks);
+                std::vector<Graph> graphs;
+                for (size_t i = 0; i < blocks.size(); i++)
+                {
+                    Graph g;
+                    g.initialize_new(blocks[i]);
+                    //printf("def: %zd, use: %zd\n", g.Def().size(), g.Use().size());
+                    graphs.push_back(g);
+                }
+
+                for (auto& g : graphs)
+                {
+                    for (size_t i = 0; i < g.Nodes.size(); i++)
+                    {
+                        printf("%s", to_string(g.Nodes[i].info).c_str());
+                    }
+                }
+
+                Liveness_Graph liveness;
+                liveness.rinitialize(graphs);
+                RegAlloc regalloc;
+                regalloc.allocate(graphs, liveness);
+
+                for (auto& g : graphs)
+                {
+                    for (size_t i = 0; i < g.Nodes.size(); i++)
+                    {
+                        printf("%s", to_string(g.Nodes[i].info).c_str());
+                    }
+                }
             }
         }
     }

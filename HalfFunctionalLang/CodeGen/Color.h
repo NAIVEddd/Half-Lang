@@ -47,8 +47,13 @@ struct Color
     std::vector<int> degree;
     std::vector<int> alias;
     std::stack<int> stack;
+    std::map<Temp::Label, int> precolor;
+    Liveness_Graph liveness;
     Color(int numRegisters) : numRegisters(numRegisters), alias(numRegisters) {}
     void initialize(Liveness& liveness);
+    void initialize(Liveness_Graph& l);
+    void precolored(std::map<Temp::Label, int>& colored);
+    std::map<Temp::Label, int> AllocateRegisters();
     void addEdge(int u, int v)
     {
         if (u != v) {

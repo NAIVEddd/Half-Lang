@@ -1,6 +1,150 @@
 #include "Assem.h"
 
 
+void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Block>& blocks)
+{
+    for (size_t i = 0; i < builder.blocks.size(); i++)
+    {
+        auto& block = builder.blocks[i];
+        for (auto& exp : block.exps)
+        {
+            printf("\n");
+            MunchExp_llvmlike(exp, blocks);
+        }
+    }
+}
+
+void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Block>& blocks)
+{
+    if (auto pfunc = std::get_if<std::shared_ptr<Half_Ir_Function>>(&exp.exp))
+    {
+        // auto& func = **pfunc;
+        printf("Half_Ir_Func\n");
+        //printf("    ");
+        //instrs.push_back(AS_Label((*pfunc)->name));
+
+        // 0.0 alloc block for function
+        (*pfunc)->alloc.exps.push_back(Half_Ir_Exp(Half_Ir_Jump((*pfunc)->blocks[0].label)));
+        size_t func_index = blocks.size();
+        (*pfunc)->alloc.label.l = (*pfunc)->name;
+        blocks.push_back(AS_Block((*pfunc)->alloc.label));
+        // 0.1 map block label to index
+        std::map<Temp::Label, size_t> block_map;
+        block_map.insert({ (*pfunc)->alloc.label, func_index});
+        for (auto& block : (*pfunc)->blocks)
+        {
+            auto b = AS_Block(block.label);
+            block_map.insert({ block.label, blocks.size() });
+            blocks.push_back(b);
+        }
+        // 0.2 update block's pred and succ
+        size_t diff = func_index + 1;
+        for (size_t i = 0; i < (*pfunc)->blocks.size(); i++)
+        {
+            auto& block = (*pfunc)->blocks[i];
+            for (auto p : block.preds)
+            {
+                blocks[i + diff].preds.push_back(p + diff);
+            }
+            for (auto s : block.succs)
+            {
+                blocks[i + diff].succs.push_back(s + diff);
+            }
+        }
+        blocks[func_index].succs.push_back(func_index + 1);
+        blocks[func_index+1].preds.push_back(func_index);
+
+        auto pinstrs = &blocks[func_index].instrs;
+        pinstrs->push_back(AS_Label((*pfunc)->name));
+        // 1. allocs stack space (according to the number of parameters)
+        auto stack_size = (*pfunc)->stack_size;
+        pinstrs->push_back(AS_StackAlloc(stack_size));
+
+        // 1.5 store parameters from registers to stack
+        auto regs = std::vector<std::string>{ "ecx","edx", "r8d", "r9d" };
+        size_t offset = 0;
+        for (size_t i = 0; i < (*pfunc)->args.size() && i < regs.size(); ++i)
+        {
+            AS_Move move(Temp::Label(std::to_string(offset) + "(%rsp)"), Temp::Label(regs[i]));
+            move.sz = (*pfunc)->args_size[i];
+            pinstrs->push_back(move);
+            offset += (*pfunc)->args_size[i];
+        }
+
+        // 2. map func blocks with label and index
+        std::map<Temp::Label, size_t> fun_block_map;
+        for (size_t i = 0; i < (*pfunc)->blocks.size(); i++)
+        {
+            auto& b = (*pfunc)->blocks[i];
+            fun_block_map.insert({ b.label, i });
+        }
+
+        // 3. pre process the phi node
+        for (size_t i = 0; i < (*pfunc)->blocks.size(); i++)
+        {
+            auto& block = (*pfunc)->blocks[i];
+            for (auto& exp : block.exps)
+            {
+                if (auto pphi = std::get_if<std::shared_ptr<Half_Ir_Phi>>(&exp.exp))
+                {
+                    auto& phi = **pphi;
+                    for (auto& [n, l] : phi.values)
+                    {
+                        if (auto p = fun_block_map.find(l.lab); p != fun_block_map.end())
+                        {
+                            auto& target_block = (*pfunc)->blocks[p->second];
+                            auto last = target_block.exps.back();
+                            target_block.exps.back() = Half_Ir_Exp(Half_Ir_Move(phi.result, n));
+                            target_block.exps.push_back(last);
+                        }
+                        else
+                        {
+                            printf("Phi node error, not found block label:%s\n", l.lab.l.c_str());
+                            _ASSERT(false);
+                        }
+                    }
+                }
+            }
+            // remove phi node
+            block.exps.erase(std::remove_if(block.exps.begin(), block.exps.end(), [](Half_Ir_Exp& e)
+                {
+                    if (auto pphi = std::get_if<std::shared_ptr<Half_Ir_Phi>>(&e.exp))
+                    {
+                        return true;
+                    }
+                    return false;
+                }), block.exps.end());
+        }
+
+        // 4. generate code for each block
+        for (auto& block : (*pfunc)->blocks)
+        {
+            // insert block label
+            pinstrs = &blocks[block_map[block.label]].instrs;
+            pinstrs->push_back(AS_Label(block.label));
+
+            for (auto& e : block.exps)
+            {
+                printf("    ");
+                if (auto pphi = std::get_if<std::shared_ptr<Half_Ir_Phi>>(&e.exp))
+                {
+                    // shouldn't be here
+                    _ASSERT(false);
+                }
+                else
+                {
+                    MunchExp_llvmlike(e, *pinstrs);
+                }
+            }
+        }
+
+        // 5. return
+        _ASSERT(std::get_if<AS_Return>(&pinstrs->back()));
+        pinstrs->back() = AS_Return(stack_size);
+        return;
+    }
+}
+
 void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs)
 {
     for (size_t i = 0; i < builder.blocks.size(); i++)
@@ -234,11 +378,11 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
                 }
                 return std::string();
             };
-        AS_Oper oper(tostring((*pop)->op), movr, movl);
+        AS_Oper oper(tostring((*pop)->op), movl, movr);
         binop.left.type.GetSize() == 8 ? oper.sz = 8 : oper.sz = 4;
         binop.right.type.GetSize() == 8 ? oper.sz = 8 : oper.sz = 4;
         instrs.push_back(oper);
-        AS_Move_Type move((*pop)->GetResult(), (*pop)->right);
+        AS_Move_Type move((*pop)->GetResult(), (*pop)->left);
         //AS_Move move(binop.out_label, movr);
         instrs.push_back(move);
         return;
@@ -252,7 +396,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         {
             args[i] = call.args[i].name;
         }
-        instrs.push_back(AS_Call(call.fun_name, args));
+        instrs.push_back(AS_Call(call.fun_name, args, call.out_label));
         return;
     }
     else if (auto pret = std::get_if<std::shared_ptr<Half_Ir_Return>>(&exp.exp))
@@ -364,7 +508,7 @@ inline std::string to_string(const AS_Move& mv)
     {
         //TODO: remove this, it's a hack
         // munch exp-binop add one instr with same src and dst
-        return "; --- ;";
+        return "# --- #\n";
     }
     std::string inst;
     if (mv.sz == 8)
@@ -490,7 +634,10 @@ inline std::string to_string(const AS_Move_Type& mv)
         }
         else
         {
-            _ASSERT(false);
+
+            inst = "movl ";
+            dst = "%" + val.reg.l;
+            //_ASSERT(false);
         }
         // check if addr is a normal address
         if (addr.base.l == "bottom" || addr.base.l == "top")

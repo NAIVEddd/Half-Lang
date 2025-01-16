@@ -26,16 +26,19 @@ struct Node
 
 struct Graph
 {
+    Temp::Label name;
     std::vector<AS_Instr> instrs;
     std::vector<Node> Nodes;
     // Label to index of line
     std::map<Temp::Label, size_t> LabelMap;
+    std::vector<Temp::Label> use_labels;
+    std::vector<Temp::Label> def_labels;
+    std::vector<size_t> Preds;
+    std::vector<size_t> Succs;
+    const std::vector<Temp::Label>& Def() const;
+    const std::vector<Temp::Label>& Use() const;
 
     Graph() = default;
     void initialize(std::vector<AS_Instr>& ins);
-};
-
-struct GTable
-{
-
+    void initialize_new(AS_Block& blocks);
 };

@@ -33,6 +33,8 @@ struct Half_Ir_BasicBlock
     };
     Temp::Label label;
     std::vector<Half_Ir_Exp> exps;
+    std::vector<size_t> preds;
+    std::vector<size_t> succs;
     Half_Ir_BasicBlock(Temp::Label l = Temp::NewBlockLabel()) : label(l) {}
     void Rename(Temp::Label l)
     {

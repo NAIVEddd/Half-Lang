@@ -54,7 +54,10 @@ std::vector<Temp::Label> Node::Def() const
     }
     else if (auto pmv = std::get_if<AS_Move_Type>(&info))
     {
-        labels.push_back(pmv->dst.GetLabel());
+        if (std::holds_alternative<Register>(pmv->dst.value))
+        {
+            labels.push_back(pmv->dst.GetLabel());
+        }
     }
     else if (auto plea = std::get_if<AS_Lea>(&info))
     {
@@ -88,6 +91,7 @@ std::vector<Temp::Label> Node::Def() const
     }
     else if (auto pcall = std::get_if<AS_Call>(&info))
     {
+        labels.push_back(pcall->out_label);
     }
     else if (auto pret = std::get_if<AS_Return>(&info))
     {
@@ -116,6 +120,10 @@ std::vector<Temp::Label> Node::Use() const
     else if (auto pmv = std::get_if<AS_Move_Type>(&info))
     {
         labels.push_back(pmv->src.GetLabel());
+        if (std::holds_alternative<Address>(pmv->dst.value))
+        {
+            labels.push_back(pmv->dst.GetLabel());
+        }
     }
     else if (auto plea = std::get_if<AS_Lea>(&info))
     {
@@ -166,7 +174,17 @@ std::vector<Temp::Label> Node::Use() const
     return { ls.begin(), ls.end() };
 }
 
-void Graph::initialize(std::vector<AS_Instr>& ins)
+const std::vector<Temp::Label>& Graph::Def() const
+{
+    return def_labels;
+}
+
+const std::vector<Temp::Label>& Graph::Use() const
+{
+    return use_labels;
+}
+
+void Graph::initialize(std::vector<AS_Instr> &ins)
 {
     instrs = ins;
     Nodes.clear();
@@ -204,4 +222,47 @@ void Graph::initialize(std::vector<AS_Instr>& ins)
         }
         Nodes[i - 1].AddEdge(*this, i - 1, i);
     }
+}
+
+void Graph::initialize_new(AS_Block& blocks)
+{
+    name = blocks.label;
+    Preds = blocks.preds;
+    Succs = blocks.succs;
+    Nodes.clear();
+    auto& instrs = blocks.instrs;
+    for (size_t i = 0; i < instrs.size(); i++)
+    {
+        Nodes.push_back(Node(instrs[i]));
+    }
+
+    // every only have one pred and one succ
+    for (size_t i = 0; i < instrs.size(); i++)
+    {
+        if (i > 0)
+        {
+            Nodes[i - 1].AddEdge(*this, i - 1, i);
+        }
+    }
+
+    std::set<Temp::Label> def_labelset;
+    std::set<Temp::Label> use_labelset;
+    for (auto& n : Nodes)
+    {
+        auto def = n.Def();
+        auto use = n.Use();
+        use_labelset.insert(use.begin(), use.end());
+        def_labelset.insert(def.begin(), def.end());
+    }
+    def_labels = { def_labelset.begin(), def_labelset.end() };
+    // find use but not def in this block
+    std::set<Temp::Label> use_not_def;
+    for (auto& l : use_labelset)
+    {
+        if (def_labelset.find(l) == def_labelset.end())
+        {
+            use_not_def.insert(l);
+        }
+    }
+    use_labels = { use_not_def.begin(), use_not_def.end() };
 }

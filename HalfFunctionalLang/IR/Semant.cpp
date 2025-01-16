@@ -133,6 +133,10 @@ Half_Type_Info Get_Expr_Type(std::shared_ptr<Table>& table, Half_Expr& expr)
         _ASSERT(false);
         return {};
     }
+    else if (auto pfuncall = std::get_if<std::shared_ptr<Half_Funcall>>(&expr.expr))
+    {
+        return Half_Type_Info::BasicType::BasicT::Int;
+    }
     _ASSERT(false);
     return Half_Type_Info();
 }
@@ -269,9 +273,9 @@ Address Trans_GetElementPtr(std::shared_ptr<Table>& table, Half_Ir_GetElementPtr
                 Half_Ir_Const ty_sz(sz);
                 auto ty_sz_res = ty_sz.GetResult();
                 Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, std::get<Register>(ty_sz_res.value), std::get<Register>(pvar->value), Temp::NewLabel());
-                Half_Ir_FetchPtr fetch(Address{ elem_type, ptr.base, ptr.offset });
                 auto binop_res = binop.GetResult();
                 Half_Ir_Ext ext(std::get<Register>(binop_res.value), binop_res.GetType(), Temp::NewLabel());
+                Half_Ir_Load fetch(Address{ elem_type, ptr.base, ptr.offset });
                 auto ext_res = ext.GetResult();
                 auto fetch_res = fetch.GetResult();
                 Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, std::get<Register>(ext_res.value), std::get<Register>(fetch_res.value), Temp::NewLabel());
@@ -340,11 +344,13 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
     {
         if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
         {
-            Half_Ir_Load load(symbol.value().addr);
-            builder.AddExp(load);
-            return Half_Ir_GetElementPtr(load.out_register);
+            Half_Ir_FetchPtr fetch(symbol.value().addr);
+            builder.AddExp(fetch);
+            Half_Ir_GetElementPtr gep(std::get<Register>(fetch.GetResult().value));
+            gep.AddIndex(Half_Ir_Const(0));
+            gep.result_element_type = *pptr->type;
+            return gep;
         }
-        auto offset = symbol.value().offset;
         Half_Ir_GetElementPtr gep(symbol.value().addr);
         gep.in_indexs.push_back(Half_Ir_Const(0));
         gep.result_element_type = symbol.value().type;
@@ -852,6 +858,39 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_FuncDecl&
     {
         func_ir.blocks.push_back(builder.blocks[i]);
     }
+
+    // 5.1 init block (label, index) map
+    std::map<Temp::Label, size_t> block_map;
+    for (size_t i = 0; i < func_ir.blocks.size(); i++)
+    {
+        block_map[func_ir.blocks[i].label] = i;
+    }
+
+    // 5.2 update block's pred and succ
+    for (size_t i = 0; i < func_ir.blocks.size(); i++)
+    {
+        auto& block = func_ir.blocks[i];
+        // TODO: only last exp in block can be jump or branch
+        for (auto& exp : block.exps)
+        {
+            if (auto pjump = std::get_if<std::shared_ptr<Half_Ir_Jump>>(&exp.exp))
+            {
+                auto idx = block_map[(*pjump)->target];
+                block.succs.push_back(idx);
+                func_ir.blocks[idx].preds.push_back(i);
+            }
+            else if (auto pbranch = std::get_if<std::shared_ptr<Half_Ir_Branch>>(&exp.exp))
+            {
+                auto t_idx = block_map[(*pbranch)->true_label];
+                auto f_idx = block_map[(*pbranch)->false_label];
+                block.succs.push_back(t_idx);
+                block.succs.push_back(f_idx);
+                func_ir.blocks[t_idx].preds.push_back(i);
+                func_ir.blocks[f_idx].preds.push_back(i);
+            }
+        }
+    }
+
     // 6. Remove the blocks from the builder
     builder.blocks.erase(builder.blocks.begin() + block_entry, builder.blocks.end());
     builder.blocks.erase(builder.blocks.begin() + builder.block_alloc_entry);

@@ -196,10 +196,11 @@ struct AS_Call
 {
     Temp::Label fun_name;
     std::vector<Temp::Label> args;
-    AS_Call(Temp::Label f, std::vector<Temp::Label>& a)
-        : fun_name(f), args(a) {}
+    Temp::Label out_label;
+    AS_Call(Temp::Label f, std::vector<Temp::Label>& a, Temp::Label o)
+        : fun_name(f), args(a), out_label(o) {}
     AS_Call(const AS_Call& o)
-        : fun_name(o.fun_name), args(o.args) {}
+        : fun_name(o.fun_name), args(o.args), out_label(o.out_label) {}
 };
 
 struct AS_Return
@@ -212,15 +213,27 @@ struct AS_Return
 
 using AS_Instr = std::variant<std::monostate, AS_String, AS_StackAlloc, AS_Oper, AS_Ext, AS_Move, AS_Move_String, AS_Move_Type, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
+struct AS_Block
+{
+    Temp::Label label;
+    std::vector<AS_Instr> instrs;
+    std::vector<size_t> preds;
+    std::vector<size_t> succs;
+    AS_Block(Temp::Label l) : label(l) {}
+    AS_Block(const AS_Block& o) : label(o.label), instrs(o.instrs), preds(o.preds), succs(o.succs){}
+};
+
 struct AS_Function
 {
     std::string name;
-    std::vector<AS_Instr> instrs;
-    AS_Function(std::string n, std::vector<AS_Instr>& i)
+    std::vector<AS_Block> instrs;
+    AS_Function(std::string n, std::vector<AS_Block>& i)
         : name(n), instrs(i) {
     }
 };
 
+void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Block>& instrs);
+void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Block>& instrs);
 void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs);
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);
 std::string to_string(const AS_Instr& instr);
