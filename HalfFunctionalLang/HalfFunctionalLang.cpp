@@ -150,23 +150,42 @@ int main(int argc, char* argv[])
     auto ir = Trans_Expr(f1.value().first, builder);
 
     // generate ast
-    std::vector<AS_Instr> instrs;
-    MunchExps_llvmlike(builder, instrs);
-
-    // analyze liveness
-    auto g = Graph();
-    g.initialize(instrs);
-    auto live = Liveness();
-    live.rinitialize(g);
-
-    //RegAlloc reg;
-    RegAlloc regalloc;
-    regalloc.allocate(g, live);
-
-    // output to file
-    for (size_t i = 0; i < g.instrs.size(); i++)
+    for (auto idx = 0; idx < builder.blocks[0].exps.size(); ++idx)
     {
-        output << to_string(g.instrs[i]);
+        std::vector<AS_Block> blocks;
+        MunchExp_llvmlike(builder.blocks[0].exps[idx], blocks);
+        std::vector<Graph> graphs;
+        for (size_t i = 0; i < blocks.size(); i++)
+        {
+            Graph g;
+            g.initialize_new(blocks[i]);
+            //printf("def: %zd, use: %zd\n", g.Def().size(), g.Use().size());
+            graphs.push_back(g);
+        }
+
+        for (auto& g : graphs)
+        {
+            for (size_t i = 0; i < g.Nodes.size(); i++)
+            {
+                printf("%s", to_string(g.Nodes[i].info).c_str());
+            }
+        }
+
+        Liveness_Graph liveness;
+        liveness.rinitialize(graphs);
+        //RegAlloc reg;
+        RegAlloc regalloc;
+        regalloc.allocate(graphs, liveness);
+
+        for (auto& g : graphs)
+        {
+            for (size_t i = 0; i < g.Nodes.size(); i++)
+            {
+                //printf("%s", to_string(g.Nodes[i].info).c_str());
+                // output to file
+                output << to_string(g.Nodes[i].info);
+            }
+        }
     }
 
     input.close();

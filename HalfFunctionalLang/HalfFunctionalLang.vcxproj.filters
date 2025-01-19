@@ -25,6 +25,9 @@
     <Filter Include="CodeGen">
       <UniqueIdentifier>{15b5b416-f061-49b4-9201-5bf351e3ef08}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Pass">
+      <UniqueIdentifier>{9b23e1a5-bb56-4f2d-8886-8e9f3b17429b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HalfFunctionalLang.cpp">
@@ -77,6 +80,12 @@
     </ClCompile>
     <ClCompile Include="IR\Type.cpp">
       <Filter>IR</Filter>
+    </ClCompile>
+    <ClCompile Include="Pass\IrFormatPass.cpp">
+      <Filter>Pass</Filter>
+    </ClCompile>
+    <ClCompile Include="Pass\Mem2RegPass.cpp">
+      <Filter>Pass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -142,6 +151,15 @@
     </ClInclude>
     <ClInclude Include="IR\Type.h">
       <Filter>IR</Filter>
+    </ClInclude>
+    <ClInclude Include="Pass\Pass.h">
+      <Filter>Pass</Filter>
+    </ClInclude>
+    <ClInclude Include="Pass\IrFormatPass.h">
+      <Filter>Pass</Filter>
+    </ClInclude>
+    <ClInclude Include="Pass\Mem2RegPass.h">
+      <Filter>Pass</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

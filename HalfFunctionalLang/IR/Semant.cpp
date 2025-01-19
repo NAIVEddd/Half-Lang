@@ -929,7 +929,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if)
     auto if_result_phi = Half_Ir_Phi(Temp::NewLabel());
 
     // jump to condition block, if current block is not empty
-    if (builder.blocks[builder.insert_point].exps.size() > 0)
+    //if (builder.blocks[builder.insert_point].exps.size() > 0)
     {
         auto jmp_to_cond = Half_Ir_Jump(cond_label);
         builder.AddExp(jmp_to_cond);
@@ -1045,7 +1045,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_While& _w
     auto end_label = builder.GenBlockLabel("while_end");
 
     // jump to condition block, if current block is not empty
-    if (builder.blocks[builder.insert_point].exps.size() > 0)
+    //if (builder.blocks[builder.insert_point].exps.size() > 0)
     {
         auto jmp_to_cond = Half_Ir_Jump(cond_label);
         builder.AddExp(jmp_to_cond);
@@ -1095,7 +1095,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_For& _for
     Trans_Expr(for_table, builder, termi_expr);
 
     // jump to condition block, if current block is not empty
-    if (builder.blocks[builder.insert_point].exps.size() > 0)
+    //if (builder.blocks[builder.insert_point].exps.size() > 0)
     {
         auto jmp_to_cond = Half_Ir_Jump(cond_label);
         builder.AddExp(jmp_to_cond);

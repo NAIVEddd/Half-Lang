@@ -13,6 +13,8 @@
 #include"CodeGen/Liveness.h"
 #include"CodeGen/Color.h"
 #include"CodeGen/RegAlloc.h"
+#include"Pass/IrFormatPass.h"
+#include"Pass/Mem2RegPass.h"
 
 std::string test_main_0 =
 R"(
@@ -1461,7 +1463,6 @@ end)";
             {
                 printf("TypeCheck success\n");
             }
-            std::vector<AS_Instr> instrs;
 
             auto ir_name = Trans_Expr(e.value().first, b);
             printf("\nbuilder exprs count: %zd\n", b.blocks[0].exps.size());
@@ -1524,6 +1525,28 @@ end)";
                     }
                 }
             }
+
+            IR_Print_Pass printer;
+            std::vector<std::string> lines;
+            for (auto idx = 0; idx < b.blocks[0].exps.size(); ++idx)
+            {
+                auto& e = b.blocks[0].exps[idx];
+                if (auto pfunc = std::get_if<std::shared_ptr<Half_Ir_Function>>(&e.exp))
+                {
+                    printf("func name: %s\n", (*pfunc)->name.c_str());
+                    CFG cfg(**pfunc);
+                    cfg.dump();
+                    DominatorTree dom(cfg);
+                    dom.dump();
+                    printf("\n");
+                }
+                //printer.Run(b.blocks[0].exps[idx]);
+            }
+            //printer.dump(lines);
+            for (size_t i = 0; i < lines.size(); i++)
+            {
+                //printf("%s\n", lines[i].c_str());
+            }
         }
     }
 }
@@ -1560,61 +1583,4 @@ void test_ir()
         auto ir = Trans_Expr(f1.value().first, builder);
     }
 
-    /* {
-        std::string prog1 = "	\
-            function square(n int) = n * n end\
-            function main() =	\
-                let x = 10		\
-                x = x + 1		\
-                square(x)		\
-            end";
-        auto f1 = pprogram(prog1);
-        _ASSERT(f1);
-        _ASSERT(f1.value().second.empty());
-
-        auto ir = Trans_Expr(f1.value().first);
-        auto exp = ir.exp;
-        std::vector<AS_Instr> instrs;
-        MunchExp(ir, instrs);
-    }*/
-
-    {
-        std::string prog1 = "			\
-            function square(n int) =	\
-                let x = n * n			\
-                x						\
-            end";
-        auto f1 = pprogram(prog1);
-        _ASSERT(f1);
-        _ASSERT(f1.value().second.empty());
-
-        auto ir = Trans_Expr(f1.value().first, builder);
-        std::vector<AS_Instr> instrs;
-        MunchExps_llvmlike(builder, instrs);
-        for (size_t i = 0; i < instrs.size(); i++)
-        {
-            printf("%zd\n", instrs[i].index());
-        }
-
-        auto g = Graph();
-        g.initialize(instrs);
-        auto live = Liveness();
-        live.initialize(g);
-        printf("\nCount %zd\n", g.Nodes.size());
-        auto rlive = Liveness();
-        rlive.rinitialize(g);
-        live == rlive;
-        Color color(8);
-        color.initialize(live);
-        color.allocate();
-        color.print();
-        RegAlloc regalloc;
-        regalloc.allocate(g, live);
-
-        /*printf("\n");
-        for (size_t i = 0; i < g.instrs.size(); i++)
-        {
-            printf("%s", to_string(g.instrs[i]).c_str());
-        }*/
-    }
 }

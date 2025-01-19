@@ -1,45 +1,5 @@
 #include "Color.h"
 
-void Color::initialize(Liveness& liveness)
-{
-    adjList.resize(liveness.temps.size());
-    color.resize(liveness.temps.size(), -1);
-    degree.resize(liveness.temps.size());
-    printf("Coloring initialize:\n");
-
-    // insert all temps into map
-    for (auto& l : liveness.temps)
-    {
-        tempMap.get(l);
-    }
-
-    // add edges
-    for (size_t i = 0; i < liveness.in.size(); ++i)
-    {
-        std::vector<Temp::Label> in = { liveness.in[i].begin(), liveness.in[i].end() };
-        for (size_t i = 0; i < in.size(); ++i)
-        {
-            for (size_t j = i + 1; j < in.size(); ++j)
-            {
-                auto u = tempMap.get(in[i]);
-                auto v = tempMap.get(in[j]);
-                addEdge(u, v);
-                printf("    add edge %d %d\n", u, v);
-            }
-        }
-    }
-
-    // Ensure all temps are considered, even if they have no edges
-    for (size_t i = 0; i < adjList.size(); ++i)
-    {
-        if (adjList[i].empty())
-        {
-            printf("    add self edge %s : %zd\n", tempMap.get((int)i).l.c_str(), i);
-            stack.push((int)i);
-        }
-    }
-}
-
 void Color::initialize(Liveness_Graph& l)
 {
     liveness = l;

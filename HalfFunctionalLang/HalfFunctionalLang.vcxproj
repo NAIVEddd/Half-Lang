@@ -145,6 +145,8 @@
     <ClCompile Include="Parser\Operator.cpp" />
     <ClCompile Include="Parser\Parser.cpp" />
     <ClCompile Include="Parser\Primitives.cpp" />
+    <ClCompile Include="Pass\IrFormatPass.cpp" />
+    <ClCompile Include="Pass\Mem2RegPass.cpp" />
     <ClCompile Include="Syntax\Base.cpp" />
     <ClCompile Include="Syntax\ExprParser.cpp" />
     <ClCompile Include="Syntax\TypeCheck.cpp" />
@@ -167,6 +169,9 @@
     <ClInclude Include="Parser\Operator.h" />
     <ClInclude Include="Parser\Parser.h" />
     <ClInclude Include="Parser\Primitives.h" />
+    <ClInclude Include="Pass\IrFormatPass.h" />
+    <ClInclude Include="Pass\Mem2RegPass.h" />
+    <ClInclude Include="Pass\Pass.h" />
     <ClInclude Include="Syntax\Base.h" />
     <ClInclude Include="Syntax\ExprParser.h" />
     <ClInclude Include="Syntax\TypeCheck.h" />
