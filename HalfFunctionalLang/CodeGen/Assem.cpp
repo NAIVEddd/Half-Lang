@@ -431,6 +431,19 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
             printf("Not support other exp type in Half_Ir_Move.right\n");
             _ASSERT(false);
         }
+        if (move.type.GetSize() == 8)
+        {
+            printf("Assem.cpp: line 436\n");
+            Register d;
+            Register s;
+            d.reg = dst.l;
+            s.reg = src.l;
+            d.type = move.type;
+            s.type = move.type;
+            AS_Move_Type mv(d, s);
+            instrs.push_back(mv);
+            return;
+        }
         instrs.push_back(AS_Move(dst, src));
         return;
     }

@@ -137,8 +137,9 @@ Half_Type_Info Get_Expr_Type(std::shared_ptr<Table>& table, Half_Expr& expr)
     {
         return Half_Type_Info::BasicType::BasicT::Int;
     }
-    _ASSERT(false);
-    return Half_Type_Info();
+    return Half_Type_Info::BasicType::BasicT::Int;
+    //_ASSERT(false);
+    //return Half_Type_Info();
 }
 
 std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl& type)

@@ -79,7 +79,7 @@ void IR_Print_Pass::Run(Half_Ir_Exp& program)
     }
     else if (auto ptr = std::get_if<std::shared_ptr<Half_Ir_Move>>(exp_ptr))
     {
-        // RunOn(**ptr);
+        RunOn(**ptr);
     }
     else if (auto ptr = std::get_if<std::shared_ptr<Half_Ir_Label>>(exp_ptr))
     {
@@ -318,7 +318,8 @@ void IR_Print_Pass::RunOn(Half_Ir_Branch& branch)
 void IR_Print_Pass::RunOn(Half_Ir_Move& move)
 {
     std::string line = std::string(indent, ' ') + "move ";
-    // line += move.out_label.l + " = " + move.value.GetLabel().l;
+    line += std::get<std::shared_ptr<Half_Ir_Name>>(move.left.exp)->name.l
+        + " = " + std::get<std::shared_ptr<Half_Ir_Name>>(move.right.exp)->name.l;
     lines.push_back(line);
 }
 

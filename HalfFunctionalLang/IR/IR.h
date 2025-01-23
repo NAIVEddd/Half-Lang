@@ -78,6 +78,15 @@ struct Address
     Half_Type_Info type;    // TODO : is this a element type or a pointer type
     Temp::Label base;
     ptrdiff_t offset;
+    bool operator<(const Address& a) const
+    {
+        return base.l < a.base.l || (base.l == a.base.l && offset < a.offset);
+    }
+    bool operator==(const Address& a) const
+    {
+        // type == a.type &&
+        return  base.l == a.base.l && offset == a.offset;
+    }
 };
 struct Register
 {
@@ -509,6 +518,7 @@ struct Half_Ir_Phi
 {
     Half_Ir_Name result;
     std::vector<std::pair<Half_Ir_Name, Half_Ir_Label>> values;
+    Half_Ir_Phi() : result(Half_Ir_Name("Invalid Phi")) {}
     Half_Ir_Phi(Half_Ir_Name r) : result(r) {}
     Half_Ir_Phi(const Half_Ir_Phi& p) : result(p.result), values(p.values) {}
     Value GetResult() const
@@ -532,6 +542,7 @@ struct Half_Ir_Move
 {
     Half_Ir_Exp left;
     Half_Ir_Exp right;
+    Half_Type_Info type;
     Half_Ir_Move(Half_Ir_Exp l, Half_Ir_Exp r)
         :left(l), right(r) {}
 };

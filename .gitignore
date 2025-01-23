@@ -65,6 +65,13 @@ artifacts/
 # StyleCop
 StyleCopReport.xml
 
+# temp files in example folder
+*.gif
+*.md
+*.s
+*.o
+*.exe
+
 # Files built by Visual Studio
 *_i.c
 *_p.c

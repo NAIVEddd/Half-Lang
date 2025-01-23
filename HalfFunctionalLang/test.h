@@ -1124,6 +1124,59 @@ function main() : int =
     0
 end)";
 
+    std::string prog13 =
+        R"(
+type int_array = array of int
+
+function Index2D (row int, col int, row_size int) : int =
+    row * row_size + col
+end
+
+function CountLiveNeighbors (arr int_array, row int, col int, row_size int) : int =
+    let count = 0
+    let idx = 0
+    for i = -1 to 2 do
+        for j = -1 to 2 do
+            let new_row = row + i
+            let new_col = col + j
+            idx = Index2D(new_row, new_col, row_size)
+            count = count + arr[idx]
+        end
+    end
+    idx = Index2D(row, col, row_size)
+    count - arr[idx]
+end
+
+function IsAlive (arr int_array, row int, col int, row_size int) : int =
+    let count = CountLiveNeighbors(arr, row, col, row_size)
+    let idx = Index2D(row, col, row_size)
+    if arr[idx] == 1 then
+        if count < 2 || count > 3 then
+            0
+        else
+            1
+        end
+    else
+        if count == 3 then
+            1
+        else
+            0
+        end
+    end
+end
+
+function UpdateArray(arr int_array, new_arr int_array, row_size int, col_size int) : int =
+    row_size = row_size - 1
+    col_size = col_size - 1
+    for i = 1 to row_size do
+        for j = 1 to col_size do
+            let idx = Index2D(i, j, row_size)
+            new_arr[idx] = IsAlive(arr, i, j, row_size)
+        end
+    end
+    0
+end)";
+
     /* {
         _ParserInput p1(prog1);
         _ASSERT(p1[0] == 'f');
@@ -1457,6 +1510,7 @@ end)";
             Builder b;
             auto check = TypeCheck();
             auto e = pprogram(prog11_0 + prog11_2 + prog11_3);
+            //auto e = pprogram(prog13);
             //auto e = pprogram(prog11);
             _ASSERT(e.value().second.empty());
             if (check.Check(e.value().first))
@@ -1526,26 +1580,28 @@ end)";
                 }
             }
 
-            IR_Print_Pass printer;
-            std::vector<std::string> lines;
             for (auto idx = 0; idx < b.blocks[0].exps.size(); ++idx)
             {
+                IR_Print_Pass printer;
+                std::vector<std::string> lines;
                 auto& e = b.blocks[0].exps[idx];
+                Mem2RegPass mem2reg;
                 if (auto pfunc = std::get_if<std::shared_ptr<Half_Ir_Function>>(&e.exp))
                 {
                     printf("func name: %s\n", (*pfunc)->name.c_str());
+                    mem2reg.Run(**pfunc);
                     CFG cfg(**pfunc);
                     cfg.dump();
                     DominatorTree dom(cfg);
                     dom.dump();
                     printf("\n");
                 }
-                //printer.Run(b.blocks[0].exps[idx]);
-            }
-            //printer.dump(lines);
-            for (size_t i = 0; i < lines.size(); i++)
-            {
-                //printf("%s\n", lines[i].c_str());
+                printer.Run(e);
+                printer.dump(lines);
+                for (size_t i = 0; i < lines.size(); i++)
+                {
+                    printf("%s\n", lines[i].c_str());
+                }
             }
         }
     }
