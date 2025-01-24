@@ -32,6 +32,12 @@ struct AS_Oper
         : sz(o.sz), assem(o.assem), dst(o.dst), src(o.src) {}
 };
 
+struct AS_Declear
+{
+    std::string func;
+    AS_Declear(std::string n) : func(n) {}
+};
+
 struct AS_Ext
 {
     Temp::Label dst;
@@ -211,7 +217,7 @@ struct AS_Return
     AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
-using AS_Instr = std::variant<std::monostate, AS_String, AS_StackAlloc, AS_Oper, AS_Ext, AS_Move, AS_Move_String, AS_Move_Type, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_String, AS_StackAlloc, AS_Oper, AS_Declear, AS_Ext, AS_Move, AS_Move_String, AS_Move_Type, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
 struct AS_Block
 {

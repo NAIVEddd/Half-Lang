@@ -1097,7 +1097,6 @@ end)";
     std::string prog11_3 =
         R"(
 function sort(arr int_array, low int, high int) : int =
-    print_int_int(low, high)
     if low < high then
         let pivotIndex = partition(arr, low, high)
         sort(arr, low, pivotIndex - 1)
@@ -1509,9 +1508,9 @@ end)";
         {   // test for code gen
             Builder b;
             auto check = TypeCheck();
-            auto e = pprogram(prog11_0 + prog11_2 + prog11_3);
+            //auto e = pprogram(prog11_0 + prog11_2 + prog11_3);
             //auto e = pprogram(prog13);
-            //auto e = pprogram(prog11);
+            auto e = pprogram(prog11);
             _ASSERT(e.value().second.empty());
             if (check.Check(e.value().first))
             {
@@ -1600,7 +1599,7 @@ end)";
                 printer.dump(lines);
                 for (size_t i = 0; i < lines.size(); i++)
                 {
-                    printf("%s\n", lines[i].c_str());
+                    //printf("%s\n", lines[i].c_str());
                 }
             }
         }
@@ -1638,5 +1637,4 @@ void test_ir()
 
         auto ir = Trans_Expr(f1.value().first, builder);
     }
-
 }

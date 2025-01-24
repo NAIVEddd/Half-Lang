@@ -152,6 +152,7 @@
     <ClCompile Include="Syntax\TypeCheck.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cmdline.h" />
     <ClInclude Include="CodeGen\Assem.h" />
     <ClInclude Include="CodeGen\Color.h" />
     <ClInclude Include="CodeGen\Graph.h" />

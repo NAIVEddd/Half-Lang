@@ -161,5 +161,8 @@
     <ClInclude Include="Pass\Mem2RegPass.h">
       <Filter>Pass</Filter>
     </ClInclude>
+    <ClInclude Include="cmdline.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

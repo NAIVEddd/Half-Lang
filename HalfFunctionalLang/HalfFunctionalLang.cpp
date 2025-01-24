@@ -2,6 +2,7 @@
 //#include "Parser/Primitives.h"
 #include "Parser/CharParsers.h"
 #include "Parser/Operator.h"
+#include "cmdline.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -27,65 +28,6 @@ struct X86Instruction {
     std::string arg2;
 };
 
-// 寄存器分配
-std::unordered_map<std::string, std::string> registerAllocation = {
-    {"t1", "eax"},
-    {"t2", "ebx"},
-    {"a", "ecx"},
-    {"b", "edx"},
-    {"c", "esi"},
-    {"d", "edi"}
-};
-
-// 将三地址代码转换为x86汇编指令
-std::vector<X86Instruction> generateX86Assembly(const std::vector<ThreeAddressCode>& tac) {
-    std::vector<X86Instruction> instructions;
-
-    for (const auto& code : tac) {
-        if (code.op == "+") {
-            instructions.push_back({ "mov", registerAllocation[code.arg1], registerAllocation[code.result] });
-            instructions.push_back({ "add", registerAllocation[code.arg2], registerAllocation[code.result] });
-        }
-        else if (code.op == "*") {
-            instructions.push_back({ "mov", registerAllocation[code.arg1], registerAllocation[code.result] });
-            instructions.push_back({ "imul", registerAllocation[code.arg2], registerAllocation[code.result] });
-        }
-        else if (code.op == "=") {
-            instructions.push_back({ "mov", registerAllocation[code.arg1], registerAllocation[code.result] });
-        }
-    }
-
-    return instructions;
-}
-
-// 输出x86汇编代码
-void printX86Assembly(const std::vector<X86Instruction>& instructions) {
-    for (const auto& instr : instructions) {
-        std::cout << instr.op << " " << instr.arg1;
-        if (!instr.arg2.empty()) {
-            std::cout << ", " << instr.arg2;
-        }
-        std::cout << std::endl;
-    }
-}
-
-int trans_three_address_code() {
-    // 示例三地址代码
-    std::vector<ThreeAddressCode> tac = {
-        {"+", "a", "b", "t1"},
-        {"*", "t1", "c", "t2"},
-        {"=", "t2", "", "d"}
-    };
-
-    // 生成x86汇编指令
-    std::vector<X86Instruction> instructions = generateX86Assembly(tac);
-
-    // 输出x86汇编代码
-    printX86Assembly(instructions);
-
-    return 0;
-}
-
 
 namespace fs = std::filesystem;
 
@@ -98,17 +40,13 @@ int main(int argc, char* argv[])
     test_operator_parser();
     test_expr_parser();*/
     /*test_ir(); */
-    test_parserinput();
+    //test_parserinput();
     //std::cout << test_main_0;
-    return 0;
+    //return 0;
 #endif // DEBUG
 
 
-    if (argc < 2) {
-        fs::path p = fs::path(argv[0]);
-        std::cerr << "Usage: " << p.filename() << " <input_file>" << std::endl;
-        return 1;
-    }
+    auto cmdline = parse_cmdline(argc, argv);
 
     std::vector<std::string> args(argv, argv + argc);
     std::string input_path = args[0];
@@ -118,7 +56,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    fs::path input_file = fs::path(args[1]);
+    fs::path input_file = fs::path(cmdline.input_file);
     if (input_file.is_relative())
     {
         input_file = fs::path(args[0]).parent_path() / input_file;
@@ -131,7 +69,7 @@ int main(int argc, char* argv[])
 
     if (input.is_open() && input.good())
     {
-        std::cout << "File is open" << std::endl;
+        //std::cout << "File is open" << std::endl;
     }
     input.clear();
 
@@ -139,15 +77,26 @@ int main(int argc, char* argv[])
     std::string line;
     while (std::getline(input, line))
     {
-        std::cout << line << std::endl;
+        //std::cout << line << std::endl;
         prog.append(line + "\n");
         //output << line << std::endl;
     }
+    input.close();
 
 
     Builder builder;
     auto f1 = pprogram(prog);
+    if (!f1)
+    {
+        std::cerr << "Syntax error" << std::endl;
+        return 1;
+    }
     auto ir = Trans_Expr(f1.value().first, builder);
+
+    if (cmdline.syntax_only)
+    {
+        return 0;
+    }
 
     // generate ast
     for (auto idx = 0; idx < builder.blocks[0].exps.size(); ++idx)
@@ -163,12 +112,27 @@ int main(int argc, char* argv[])
             graphs.push_back(g);
         }
 
-        for (auto& g : graphs)
+        if (cmdline.ir_only)
         {
-            for (size_t i = 0; i < g.Nodes.size(); i++)
+            IR_Print_Pass printer;
+            std::vector<std::string> lines;
+            printer.Run(builder.blocks[0].exps[idx]);
+            printer.dump(lines);
+            if (cmdline.print_to_stdout)
             {
-                printf("%s", to_string(g.Nodes[i].info).c_str());
+                for (size_t i = 0; i < lines.size(); i++)
+                {
+                    printf("%s", lines[i].c_str());
+                }
             }
+            if (cmdline.output_to_file)
+            {
+                for (size_t i = 0; i < lines.size(); i++)
+                {
+                    output << lines[i];
+                }
+            }
+            continue;
         }
 
         Liveness_Graph liveness;
@@ -177,18 +141,59 @@ int main(int argc, char* argv[])
         RegAlloc regalloc;
         regalloc.allocate(graphs, liveness);
 
-        for (auto& g : graphs)
+
+        if (cmdline.graph_only)
         {
-            for (size_t i = 0; i < g.Nodes.size(); i++)
+            if (cmdline.print_to_stdout)
             {
-                //printf("%s", to_string(g.Nodes[i].info).c_str());
-                // output to file
-                output << to_string(g.Nodes[i].info);
+                for (auto& g : graphs)
+                {
+                    for (size_t i = 0; i < g.Nodes.size(); i++)
+                    {
+                        printf("%s", to_string(g.Nodes[i].info).c_str());
+                    }
+                }
+            }
+            if (cmdline.output_to_file)
+            {
+                for (auto& g : graphs)
+                {
+                    for (size_t i = 0; i < g.Nodes.size(); i++)
+                    {
+                        // output to file
+                        output << to_string(g.Nodes[i].info);
+                    }
+                }
+            }
+            continue;
+        }
+
+        AS_Declear decl(blocks[0].label.l);
+        if (cmdline.output_to_file)
+        {
+            output << to_string(decl);
+            for (auto& g : graphs)
+            {
+                for (size_t i = 0; i < g.Nodes.size(); i++)
+                {
+                    // output to file
+                    output << to_string(g.Nodes[i].info);
+                }
+            }
+        }
+        if (cmdline.print_to_stdout)
+        {
+            printf("%s", to_string(decl).c_str());
+            for (auto& g : graphs)
+            {
+                for (size_t i = 0; i < g.Nodes.size(); i++)
+                {
+                    printf("%s", to_string(g.Nodes[i].info).c_str());
+                }
             }
         }
     }
 
-    input.close();
     output.close();
     return 0;
 }

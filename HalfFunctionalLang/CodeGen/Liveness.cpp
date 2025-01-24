@@ -103,7 +103,7 @@ void Liveness_InBlock::rinitialize(const Graph& g)
     }
     
     // print interferences
-    std::map<Temp::Label, std::set<Temp::Label>> labelmap2;
+    /*std::map<Temp::Label, std::set<Temp::Label>> labelmap2;
     GetInterferenceGraph(labelmap2);
     for (auto& [l, interferences_l] : labelmap2)
     {
@@ -113,7 +113,7 @@ void Liveness_InBlock::rinitialize(const Graph& g)
             std::cout << l2.l << " ";
         }
         std::cout << "\n";
-    }
+    }*/
 
     /*for (size_t i = 0; i < in.size(); ++i)
     {

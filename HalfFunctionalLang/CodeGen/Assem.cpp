@@ -8,7 +8,7 @@ void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Block>& blocks)
         auto& block = builder.blocks[i];
         for (auto& exp : block.exps)
         {
-            printf("\n");
+            //printf("\n");
             MunchExp_llvmlike(exp, blocks);
         }
     }
@@ -19,7 +19,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Block>& blocks)
     if (auto pfunc = std::get_if<std::shared_ptr<Half_Ir_Function>>(&exp.exp))
     {
         // auto& func = **pfunc;
-        printf("Half_Ir_Func\n");
+        //printf("Half_Ir_Func\n");
         //printf("    ");
         //instrs.push_back(AS_Label((*pfunc)->name));
 
@@ -125,7 +125,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Block>& blocks)
 
             for (auto& e : block.exps)
             {
-                printf("    ");
+                //printf("    ");
                 if (auto pphi = std::get_if<std::shared_ptr<Half_Ir_Phi>>(&e.exp))
                 {
                     // shouldn't be here
@@ -152,7 +152,7 @@ void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs)
         auto& block = builder.blocks[i];
         for (auto& exp : block.exps)
         {
-            printf("\n");
+            //printf("\n");
             MunchExp_llvmlike(exp, instrs);
         }
     }
@@ -166,14 +166,14 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
 {
     if (auto pload = std::get_if<std::shared_ptr<Half_Ir_Load>>(&exp.exp))
     {
-        printf("Half_Ir_Load:\n");
+        //printf("Half_Ir_Load:\n");
         AS_Move_Type move((*pload)->out_register, (*pload)->address);
         instrs.push_back(move);
         return;
     }
     else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_Store>>(&exp.exp))
     {
-        printf("Half_Ir_Store:\n");
+        //printf("Half_Ir_Store:\n");
         auto base_l = (*pstore)->address.base.l;
         auto reg = base_l == "bottom" ? "(%rsp)"
             : (base_l == "top" ? "(%rbp)" : "(" + base_l + ")");
@@ -215,14 +215,15 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto plabel = std::get_if<std::shared_ptr<Half_Ir_Label>>(&exp.exp))
     {
-        printf("Half_Ir_Label: %s\n", (*plabel)->lab.l.c_str());
+        //printf("Half_Ir_Label: %s\n", (*plabel)->lab.l.c_str());
         instrs.push_back(AS_Label((*plabel)->lab));
         return;
     }
     else if (auto pfunc = std::get_if<std::shared_ptr<Half_Ir_Function>>(&exp.exp))
     {
-        printf("Half_Ir_Func\n");
-        printf("    ");
+        //printf("Half_Ir_Func\n");
+        //printf("    ");
+        instrs.push_back(AS_Declear((*pfunc)->name));
         instrs.push_back(AS_Label((*pfunc)->name));
 
         // 1. allocs stack space (according to the number of parameters)
@@ -293,7 +294,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
 
             for (auto& e : block.exps)
             {
-                printf("    ");
+                //printf("    ");
                 if (auto pphi = std::get_if<std::shared_ptr<Half_Ir_Phi>>(&e.exp))
                 {
                     // shouldn't be here
@@ -313,7 +314,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto pgetptr = std::get_if<std::shared_ptr<Half_Ir_GetElementPtr>>(&exp.exp))
     {
-        printf("Half_Ir_GetElementPtr\n");
+        //printf("Half_Ir_GetElementPtr\n");
         /*auto& getptr = **pgetptr;
         std::vector<Temp::Label> offsets;
         for (size_t i = 0; i < getptr.in_index.size(); ++i)
@@ -338,7 +339,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto pfetch = std::get_if<std::shared_ptr<Half_Ir_FetchPtr>>(&exp.exp))
     {
-        printf("Half_Ir_FetchPtr\n");
+        //printf("Half_Ir_FetchPtr\n");
         auto& fetch = **pfetch;
         auto base_l = fetch.ptr.base.l;
         auto reg = base_l == "bottom" ? "rsp"
@@ -352,7 +353,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     else if (auto pop = std::get_if<std::shared_ptr<Half_Ir_BinOp>>(&exp.exp))
     {
         auto& binop = **pop;
-        printf("Half_Ir_Op\n");
+        //printf("Half_Ir_Op\n");
         auto movl = binop.left.reg;
         auto movr = binop.right.reg;
         auto tostring = [](Half_Ir_BinOp::Oper op)
@@ -389,7 +390,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto pcall = std::get_if<std::shared_ptr<Half_Ir_Call>>(&exp.exp))
     {
-        printf("Half_Ir_Call\n");
+        //printf("Half_Ir_Call\n");
         auto& call = **pcall;
         std::vector<Temp::Label> args(call.args.size());
         for (size_t i = 0; i < call.args.size(); i++)
@@ -401,7 +402,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto pret = std::get_if<std::shared_ptr<Half_Ir_Return>>(&exp.exp))
     {
-        printf("Half_Ir_Return\n");
+        //printf("Half_Ir_Return\n");
         auto v = (*pret)->value;
         auto label = v.GetLabel();
         instrs.push_back(AS_Move(Temp::Label("%eax"), label));
@@ -410,7 +411,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto pmove = std::get_if<std::shared_ptr<Half_Ir_Move>>(&exp.exp))
     {
-        printf("Half_Ir_Move\n");
+        //printf("Half_Ir_Move\n");
         auto& move = **pmove;
         Temp::Label dst, src;
         if (auto pname = std::get_if<std::shared_ptr<Half_Ir_Name>>(&move.left.exp))
@@ -449,7 +450,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto pbr = std::get_if<std::shared_ptr<Half_Ir_Branch>>(&exp.exp))
     {
-        printf("Half_Ir_Branch\n");
+        //printf("Half_Ir_Branch\n");
         auto& branch = **pbr;
 
         instrs.push_back(AS_Oper("cmp", branch.condition.left.name, branch.condition.right.name));
@@ -459,14 +460,14 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto pjmp = std::get_if<std::shared_ptr<Half_Ir_Jump>>(&exp.exp))
     {
-        printf("Half_Ir_Jump\n");
+        //printf("Half_Ir_Jump\n");
         auto& jmp = **pjmp;
         instrs.push_back(AS_Jump("jmp", jmp.target));
         return;
     }
     else
     {
-        printf("None\n");
+        printf("MunchExp None-- invalid expr--\n");
         _ASSERT(false);
     }
 }
@@ -764,6 +765,10 @@ std::string to_string(const AS_Instr& instr)
     else if (auto pop = std::get_if<AS_Oper>(&instr))
     {
         return to_string(*pop);
+    }
+    else if (auto pdecl = std::get_if<AS_Declear>(&instr))
+    {
+        return ".globl " + pdecl->func + "\n";
     }
     else if (auto pext = std::get_if<AS_Ext>(&instr))
     {
