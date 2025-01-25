@@ -1,0 +1,25 @@
+function for_1_to_n(n int) : int =
+    let sum = 0
+    for i = 1 to n do
+        sum = sum + i
+    end
+    sum
+end
+
+function for_pn_n(n int) : int =
+    let sum = 0
+    let s = 0 - n
+    for i = s to n do
+        sum = sum + i
+    end
+    sum
+end
+
+function for_rev_n(n int) : int =
+    let sum = 0
+    let s = 0 - n
+    for i = n downto s do
+        sum = sum + i
+    end
+    sum
+end

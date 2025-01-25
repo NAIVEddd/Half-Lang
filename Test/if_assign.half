@@ -1,0 +1,26 @@
+function if_ge_10(v int) : int =
+    if v >= 10 then
+        1
+    else
+        0
+    end
+end
+
+function if_g_10(v int) : int =
+    if v > 10 then
+        v = 1
+        v
+    else
+        v = 0
+        v
+    end
+end
+
+function if_g_10_v2(v int) : int =
+    let x = if v > 10 then
+            1
+        else
+            0
+        end
+    x
+end

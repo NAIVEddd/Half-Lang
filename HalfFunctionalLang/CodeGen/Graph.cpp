@@ -184,46 +184,6 @@ const std::vector<Temp::Label>& Graph::Use() const
     return use_labels;
 }
 
-void Graph::initialize(std::vector<AS_Instr> &ins)
-{
-    instrs = ins;
-    Nodes.clear();
-    for (size_t i = 0; i < instrs.size(); i++)
-    {
-        printf("%d ", (int) instrs[i].index());
-        Nodes.push_back(Node(instrs[i]));
-        if (auto plab = std::get_if<AS_Label>(&instrs[i]))
-        {
-            LabelMap.insert({ plab->label, i });
-        }
-    }
-    for (size_t i = 0; i < instrs.size(); i++)
-    {
-        if (auto pop = std::get_if<AS_Oper>(&instrs[i]))
-        {
-            
-        }
-        else if (auto pmv = std::get_if<AS_Move>(&instrs[i]))
-        {
-
-        }
-        else if (auto pjmp = std::get_if<AS_Jump>(&instrs[i]))
-        {
-            Nodes[i].AddEdge(*this, i, LabelMap[pjmp->target]);
-            return;
-        }
-        else if (auto plab = std::get_if<AS_Label>(&instrs[i]))
-        {
-            continue;
-        }
-        else if (auto pret = std::get_if<AS_Return>(&instrs[i]))
-        {
-            
-        }
-        Nodes[i - 1].AddEdge(*this, i - 1, i);
-    }
-}
-
 void Graph::initialize_new(AS_Block& blocks)
 {
     name = blocks.label;

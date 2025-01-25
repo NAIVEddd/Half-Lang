@@ -21,6 +21,6 @@ int main(void) {
         }
     }
 
-    std::cout << "Success:  test_square pass." << std::endl;
+    
     return 0;
 }

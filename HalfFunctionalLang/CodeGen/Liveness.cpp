@@ -322,7 +322,6 @@ void Liveness_Graph::rinitialize(std::vector<Graph>& gs)
 void Liveness_Graph::GetBlockInterferenceGraph(size_t index, std::map<Temp::Label, std::set<Temp::Label>>& labelmap)
 {
     blocks[index].GetInterferenceGraph(labelmap);
-    auto& l = temps[index];
     std::set<Temp::Label> interferences_l;
     // insert livein[index] and liveout[index] into interferences_l
     for (auto& j : livein[index])

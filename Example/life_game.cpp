@@ -90,7 +90,6 @@ int main(int argc, const char * argv[])
         copy_buffer_to_image(buffer, width, height);
         
         // Write the frame to the gif
-        printf( "Writing frame %d...\n", frame );
         GifWriteFrame( &writer, image, width, height, 2, 8, true );
     }
     

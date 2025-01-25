@@ -1,0 +1,54 @@
+type int_array = array of int
+
+function swap(arr int_array, i int, j int) : int =
+    let t = arr[i]
+    arr[i] = arr[j]
+    arr[j] = t
+    0
+end
+
+function partition(arr int_array, low int, high int) : int =
+    let pivot = arr[low]
+    let i = low
+    let j = high
+    while i < j do
+        while i < j && arr[j] >= pivot do
+            j = j - 1
+        end
+        if i < j then
+            arr[i] = arr[j]
+            i = i + 1
+        else
+            0
+        end
+        while i < j && arr[i] <= pivot do
+            i = i + 1
+        end
+        if i < j then
+            arr[j] = arr[i]
+            j = j - 1
+        else
+            0
+        end
+    end
+    arr[i] = pivot
+    i
+end
+
+function sort(arr int_array, low int, high int) : int =
+    if low < high then
+        let pivotIndex = partition(arr, low, high)
+        sort(arr, low, pivotIndex - 1)
+        sort(arr, pivotIndex + 1, high)
+        1
+    else
+        2
+    end
+end
+
+type int_11 = array of int[11]
+function main() : int =
+    let arr = int_11 [[3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 7]]
+    sort(arr, 0, 10)
+    0
+end

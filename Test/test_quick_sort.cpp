@@ -34,6 +34,6 @@ int main(void) {
             return 1;
         }
     }
-    std::cout << "Success:  test_quick_sort pass." << std::endl;
+    
     return 0;
 }

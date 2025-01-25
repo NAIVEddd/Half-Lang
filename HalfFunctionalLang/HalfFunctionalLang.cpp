@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
 
         Liveness_Graph liveness;
         liveness.rinitialize(graphs);
-        //RegAlloc reg;
+
         RegAlloc regalloc;
         regalloc.allocate(graphs, liveness);
 

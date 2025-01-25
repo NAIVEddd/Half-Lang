@@ -27,7 +27,6 @@ struct Node
 struct Graph
 {
     Temp::Label name;
-    std::vector<AS_Instr> instrs;
     std::vector<Node> Nodes;
     // Label to index of line
     std::map<Temp::Label, size_t> LabelMap;
@@ -39,6 +38,5 @@ struct Graph
     const std::vector<Temp::Label>& Use() const;
 
     Graph() = default;
-    void initialize(std::vector<AS_Instr>& ins);
     void initialize_new(AS_Block& blocks);
 };

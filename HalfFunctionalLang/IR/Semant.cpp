@@ -801,13 +801,34 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Assign& a
     return rval;
 }
 
+Value Trans_Funcall_Args(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& expr)
+{
+    if (auto pvar = std::get_if<std::shared_ptr<Half_Var>>(&expr.expr))
+    {
+        auto& var = **pvar;
+        // check is var a array type
+        auto symbol = table->find(var.name());
+        if (!symbol)
+        {
+            _ASSERT(false);
+        }
+        if (auto parray = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
+        {
+            auto address = Trans_Left_Var(table, builder, var);
+            Half_Ir_FetchPtr fetch(address);
+            builder.AddExp(fetch);
+            return fetch.GetResult();
+        }
+    }
+    return Trans_Expr(table, builder, expr);
+}
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Funcall& funcall)
 {
     std::vector<Half_Ir_Name> arg_exp(funcall.args.size());
     for (size_t i = 0; i < funcall.args.size(); i++)
     {
-        auto arg = Trans_Expr(table, builder, funcall.args[i]);
+        auto arg = Trans_Funcall_Args(table, builder, funcall.args[i]);
         arg_exp[i] = arg.GetLabel();
     }
     Half_Ir_Call call(Temp::NewLabel(), Temp::Label(funcall.name), arg_exp);
@@ -922,9 +943,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if)
 
     auto cond_label = builder.GenBlockLabel("if_cond");
     auto block_if_true_label = builder.GenBlockLabel("if_true");
-    auto block_if_true_phi_label = builder.GenBlockLabel("if_true_phi");
     auto block_if_false_label = builder.GenBlockLabel("if_false");
-    auto block_if_false_phi_label = builder.GenBlockLabel("if_false_phi");
     auto block_if_end_label = builder.GenBlockLabel("if_merge");
 
     auto if_result_phi = Half_Ir_Phi(Temp::NewLabel());
@@ -936,28 +955,12 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if)
         builder.AddExp(jmp_to_cond);
     }
 
-    auto true_used_var = std::map<Half_Var, Half_Ir_Name>();
-    auto false_used_var = std::map<Half_Var, Half_Ir_Name>();
-    auto common_used_var = std::vector<std::pair<Half_Ir_Name, Half_Ir_Label>>();
-
     /// translate condition
     auto cond_entry = builder.NewBlock(cond_label);
     builder.SetInsertPoint(cond_entry);
     Trans_If_Cond(table, builder, _if.condition, "if_cond",
         block_if_true_label, block_if_false_label);
 
-    /// translate body
-    auto insert_var = [](std::map<Half_Var, Half_Ir_Name>& used_var, const Table& tab, const Half_Expr& e, Half_Ir_Name& label)
-        {
-            if (auto passign = std::get_if<std::shared_ptr<Half_Assign>>(&e.expr))
-            {
-                auto& assign = **passign;
-                if (tab.find(assign.left.name(), false))
-                {
-                    used_var[assign.left] = label;
-                }
-            }
-        };
     auto if_true_entry = builder.NewBlock(block_if_true_label);
     builder.SetInsertPoint(if_true_entry);
     if (auto pvec = std::get_if<std::shared_ptr<std::vector<Half_Expr>>>(&_if.trueExpr.expr))
@@ -969,14 +972,8 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if)
         {
             result = Trans_Expr(true_table, builder, vec[i]);
             Half_Ir_Name l = result.GetLabel();
-            insert_var(true_used_var, true_table, vec[i], l);
         }
-        auto jmp_to_phi = Half_Ir_Jump(block_if_true_phi_label);
-        builder.AddExp(jmp_to_phi);
-
-        // insert last result to phi node
-        builder.SetInsertPoint(builder.NewBlock(block_if_true_phi_label));
-        if_result_phi.Insert(Half_Ir_Name(result.GetLabel()), block_if_true_phi_label);
+        if_result_phi.Insert(Half_Ir_Name(result.GetLabel()), block_if_true_label);
         auto jmp_to_end = Half_Ir_Jump(block_if_end_label);
         builder.AddExp(jmp_to_end);
     }
@@ -996,14 +993,8 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if)
         {
             result = Trans_Expr(false_table, builder, vec[i]);
             Half_Ir_Name l = result.GetLabel();
-            insert_var(false_used_var, false_table, vec[i], l);
         }
-        auto jmp_to_phi = Half_Ir_Jump(block_if_false_phi_label);
-        builder.AddExp(jmp_to_phi);
-
-        // insert last result to phi node
-        builder.SetInsertPoint(builder.NewBlock(block_if_false_phi_label));
-        if_result_phi.Insert(Half_Ir_Name(result.GetLabel()), block_if_false_phi_label);
+        if_result_phi.Insert(Half_Ir_Name(result.GetLabel()), block_if_false_label);
         auto jmp_to_end = Half_Ir_Jump(block_if_end_label);
         builder.AddExp(jmp_to_end);
     }
@@ -1016,24 +1007,6 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_If& _if)
     //  to make sure the phi node is in the end
     auto if_end_entry = builder.NewBlock(block_if_end_label);
     builder.SetInsertPoint(if_end_entry);
-
-    // find out common used var in true and false block
-    auto find_begin = true_used_var.begin();
-    auto find_end = true_used_var.end();
-    for (auto& v : false_used_var)
-    {
-        auto t_iter = true_used_var.find(v.first);
-        if (t_iter != true_used_var.end())
-        {
-            // print debug info
-            printf("Common used var: %s\n", v.first.name().c_str());
-            // convert common used var to phi
-            auto phi = Half_Ir_Phi(Temp::NewLabel());
-            phi.Insert(t_iter->second, block_if_true_phi_label);
-            phi.Insert(v.second, block_if_false_phi_label);
-            builder.AddExp(phi);
-        }
-    }
 
     builder.AddExp(if_result_phi);
     return if_result_phi.GetResult();
@@ -1105,7 +1078,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_For& _for
     // condition block
     auto cond_block = builder.NewBlock(cond_label);
     builder.SetInsertPoint(cond_block);
-    auto cond = Half_Op(_for.isup? "<" : ">", Half_Op::Half_OpExpr(_for.var), Half_Op::Half_OpExpr(termi_var));
+    auto cond = Half_Op(_for.isup? "<=" : ">=", Half_Op::Half_OpExpr(_for.var), Half_Op::Half_OpExpr(termi_var));
     auto cond_expr = Half_Expr(cond);
     Trans_If_Cond(for_table, builder, cond_expr, "for_cond",
         body_label, end_label);
