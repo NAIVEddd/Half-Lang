@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
         std::cerr << "Syntax error" << std::endl;
         return 1;
     }
-    auto ir = Trans_Expr(f1.value().first, builder);
+    Trans_Outer(f1.value().first, builder);
 
     if (cmdline.syntax_only)
     {

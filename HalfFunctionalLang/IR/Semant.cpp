@@ -142,113 +142,146 @@ Half_Type_Info Get_Expr_Type(std::shared_ptr<Table>& table, Half_Expr& expr)
     //return Half_Type_Info();
 }
 
+//std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl& type);
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, std::monostate& type)
+{
+    _ASSERT(false);
+    return nullptr;
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::name_ref_t& type)
+{
+    //_ASSERT(false);
+    auto pty = table->findType(type).value_or(nullptr);
+    if (!pty)
+    {
+        printf("Type not found: %s\n", type.c_str());
+        _ASSERT(false);
+    }
+    return pty;
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::Nil& type)
+{
+    return std::make_shared<Half_Type_Info>(Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Int));
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::Additional& type)
+{
+    return nullptr;
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::Ptr& type)
+{
+    auto opt_ty = table->findType(type.target);
+    if (!opt_ty)
+    {
+        printf("Type not found: %s\n", type.target.c_str());
+        _ASSERT(false);
+    }
+    auto ptr = Half_Type_Info::PointerType(opt_ty.value());
+    return std::make_shared<Half_Type_Info>(ptr);
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::BasicType& type)
+{
+    auto opt_ty = table->findType(type.type_name);
+    return opt_ty.value_or(nullptr);
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::TupleType& type)
+{
+    _ASSERT(false);
+    return nullptr;
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::RenameType& type)
+{
+    auto target = Trans_Type(table, *type.type);
+    table->insert(type.name, target);
+    return table->findType(type.name).value();
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::IncompleteArrayType& type)
+{
+    auto opt_ty = table->findType(type.type_name);
+    if (!opt_ty)
+    {
+        printf("Type not found: %s\n", type.type_name.c_str());
+        _ASSERT(false);
+    }
+    auto arr = Half_Type_Info::PointerType(opt_ty.value());
+    return std::make_shared<Half_Type_Info>(arr);
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::CompleteArrayType& type)
+{
+    auto opt_ty = table->findType(type.incomplete_array_name);
+    if (!opt_ty)
+    {
+        printf("Type not found: %s\n", type.incomplete_array_name.c_str());
+        _ASSERT(false);
+    }
+    auto arr = Half_Type_Info::ArrayType(opt_ty.value(), type.count);
+    return std::make_shared<Half_Type_Info>(arr);
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::ArrayType& type)
+{
+    auto opt_ty = table->findType(type.type_name);
+    if (!opt_ty)
+    {
+        printf("Type not found: %s\n", type.type_name.c_str());
+        _ASSERT(false);
+    }
+    auto arr = Half_Type_Info::ArrayType(opt_ty.value(), type.count);
+    return std::make_shared<Half_Type_Info>(arr);
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::StructType& type)
+{
+    std::vector<Half_Type_Info::StructType::TypePair> fields;
+    size_t offset = 0;
+    for (auto& f : type.field_list)
+    {
+        auto opt_ty = table->findType(f.type);
+        if (!opt_ty)
+        {
+            printf("Type not found: %s\n", f.type.c_str());
+            _ASSERT(false);
+        }
+        auto ty = opt_ty.value();
+        auto field = Half_Type_Info::StructType::TypePair(f.name, opt_ty.value(), offset);
+        fields.push_back(field);
+
+        // TODO: align
+        //    eg. int a, char b, int c, have to align char b to 4 bytes
+        offset += ty->GetSize();
+    }
+    auto str = Half_Type_Info::StructType(type.name, fields);
+    auto pty = std::make_shared<Half_Type_Info>(str);
+    table->insert(type.name, pty);
+    return pty;
+}
+std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl::FuncType& type)
+{
+    std::vector<std::shared_ptr<Half_Type_Info>> args;
+    for (auto& a : type.parameter_types)
+    {
+        auto opt_ty = table->findType(a);
+        if (!opt_ty)
+        {
+            printf("Type not found: %s\n", a.c_str());
+            _ASSERT(false);
+        }
+        args.push_back(opt_ty.value());
+    }
+    auto ret = table->findType(type.return_type);
+    if (!ret)
+    {
+        printf("Type not found: %s\n", type.return_type.c_str());
+        _ASSERT(false);
+    }
+    auto func = Half_Type_Info::FuncType(ret.value(), args);
+    return std::make_shared<Half_Type_Info>(func);
+}
+
+
 std::shared_ptr<Half_Type_Info> Trans_Type(std::shared_ptr<Table>& table, Half_TypeDecl& type)
 {
-    if (auto prename = std::get_if<Half_TypeDecl::RenameType>(&type.type))
-    {
-        auto target = Trans_Type(table, *prename->type);
-        table->insert(prename->name, target);
-        return table->findType(prename->name).value();
-    }
-    else if (auto ptype = std::get_if<Half_TypeDecl::BasicType>(&type.type))
-    {
-        // do nothing
-        auto opt_ty = table->findType(ptype->type_name);
-        return opt_ty.value_or(nullptr);
-    }
-    else if (auto ptype = std::get_if<Half_TypeDecl::name_ref_t>(&type.type))
-    {
-        auto opt_ty = table->findType(*ptype);
-        return opt_ty.value_or(nullptr);
-    }
-    else if (auto ptype = std::get_if<Half_TypeDecl::Ptr>(&type.type))
-    {
-        // do nothing
-        auto opt_ty = table->findType(ptype->target);
-        if (!opt_ty)
+    return std::visit([&](auto&& arg)
         {
-            printf("Type not found: %s\n", ptype->target.c_str());
-            _ASSERT(false);
-        }
-        auto ptr = Half_Type_Info::PointerType(opt_ty.value());
-        return std::make_shared<Half_Type_Info>(ptr);
-    }
-    else if (auto ptype = std::get_if<Half_TypeDecl::TupleType>(&type.type))
-    {
-        for (auto& t : ptype->type_list)
-        {
-        }
-    }
-    else if (auto ptype = std::get_if<Half_TypeDecl::IncompleteArrayType>(&type.type))
-    {
-        auto opt_ty = table->findType(ptype->type_name);
-        if (!opt_ty)
-        {
-            printf("Type not found: %s\n", ptype->type_name.c_str());
-            _ASSERT(false);
-        }
-        auto arr = Half_Type_Info::PointerType(opt_ty.value());
-        return std::make_shared<Half_Type_Info>(arr);
-    }
-    else if (auto ptype = std::get_if<Half_TypeDecl::ArrayType>(&type.type))
-    {
-        auto opt_ty = table->findType(ptype->type_name);
-        if (!opt_ty)
-        {
-            printf("Type not found: %s\n", ptype->type_name.c_str());
-            _ASSERT(false);
-        }
-        auto arr = Half_Type_Info::ArrayType(opt_ty.value(), ptype->count);
-        return std::make_shared<Half_Type_Info>(arr);
-    }
-    else if (auto ptype = std::get_if<Half_TypeDecl::StructType>(&type.type))
-    {
-        std::vector<Half_Type_Info::StructType::TypePair> fields;
-        size_t offset = 0;
-        for (auto& f : ptype->field_list)
-        {
-            auto opt_ty = table->findType(f.type);
-            if (!opt_ty)
-            {
-                printf("Type not found: %s\n", f.type.c_str());
-                _ASSERT(false);
-            }
-            auto ty = opt_ty.value();
-            auto field = Half_Type_Info::StructType::TypePair(f.name, opt_ty.value(), offset);
-            fields.push_back(field);
-
-            // TODO: align
-            //    eg. int a, char b, int c, have to align char b to 4 bytes
-            offset += ty->GetSize();
-        }
-        auto str = Half_Type_Info::StructType(ptype->name, fields);
-        auto pty = std::make_shared<Half_Type_Info>(str);
-        table->insert(ptype->name, pty);
-        return pty;
-    }
-    else if (auto ptype = std::get_if<Half_TypeDecl::FuncType>(&type.type))
-    {
-        std::vector<std::shared_ptr<Half_Type_Info>> args;
-        for (auto& a : ptype->parameter_types)
-        {
-            auto opt_ty = table->findType(a);
-            if (!opt_ty)
-            {
-                printf("Type not found: %s\n", a.c_str());
-                _ASSERT(false);
-            }
-            args.push_back(opt_ty.value());
-        }
-        auto ret = table->findType(ptype->return_type);
-        if (!ret)
-        {
-            printf("Type not found: %s\n", ptype->return_type.c_str());
-            _ASSERT(false);
-        }
-        auto func = Half_Type_Info::FuncType(ret.value(), args);
-        return std::make_shared<Half_Type_Info>(func);
-    }
-    return nullptr;
+            return Trans_Type(table, arg);
+        }, type.type);
 }
 
 Address Trans_GetElementPtr(std::shared_ptr<Table>& table, Half_Ir_GetElementPtr& ptr, Builder& builder)
@@ -270,7 +303,7 @@ Address Trans_GetElementPtr(std::shared_ptr<Table>& table, Half_Ir_GetElementPtr
             }
             else if (auto pvar = std::get_if<Value>(&idx))
             {
-                auto sz = (int)elem_type->GetSize();
+                /*auto sz = (int)elem_type->GetSize();
                 Half_Ir_Const ty_sz(sz);
                 auto ty_sz_res = ty_sz.GetResult();
                 Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, std::get<Register>(ty_sz_res.value), std::get<Register>(pvar->value), Temp::NewLabel());
@@ -286,7 +319,7 @@ Address Trans_GetElementPtr(std::shared_ptr<Table>& table, Half_Ir_GetElementPtr
                 builder.AddExp(fetch);
                 builder.AddExp(binop2);
                 ptr.base = binop2.GetResult().GetLabel();
-                ptr.offset = 0;
+                ptr.offset = 0;*/
             }
 
             auto& ptr_ty = *pptr_ty;
@@ -308,51 +341,72 @@ Address Trans_GetElementPtr(std::shared_ptr<Table>& table, Half_Ir_GetElementPtr
             auto sz = (int)parray_ty->type->GetSize();
             if (auto pvar = std::get_if<Value>(&idx))
             {
-                Half_Ir_Const ty_sz(sz);
-                auto ty_sz_res = ty_sz.GetResult();
-                Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, std::get<Register>(ty_sz_res.value), std::get<Register>(pvar->value), Temp::NewLabel());
-                Half_Ir_FetchPtr fetch(Address{ parray_ty->type, ptr.base, ptr.offset });
-                auto binop_res = binop.GetResult();
-                Half_Ir_Ext ext(std::get<Register>(binop_res.value), binop_res.GetType(), Temp::NewLabel());
-                auto ext_res = ext.GetResult();
-                auto fetch_res = fetch.GetResult();
-                Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, std::get<Register>(ext_res.value), std::get<Register>(fetch_res.value), Temp::NewLabel());
-                //Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, binop.GetResult().GetLabel(), fetch.GetResult().GetLabel(), Temp::NewLabel());
-                builder.AddExp(ty_sz);
-                builder.AddExp(binop);
-                builder.AddExp(ext);
-                builder.AddExp(fetch);
-                builder.AddExp(binop2);
-                ptr.base = binop2.GetResult().GetLabel();
-                ptr.offset = 0;
+                //Half_Ir_Const ty_sz(sz);
+                //auto ty_sz_res = ty_sz.GetResult();
+                //Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, std::get<Register>(ty_sz_res.value), std::get<Register>(pvar->value), Temp::NewLabel());
+                //Half_Ir_FetchPtr fetch(Address{ parray_ty->type, ptr.base, ptr.offset });
+                //auto binop_res = binop.GetResult();
+                //Half_Ir_Ext ext(std::get<Register>(binop_res.value), binop_res.GetType(), Temp::NewLabel());
+                //auto ext_res = ext.GetResult();
+                //auto fetch_res = fetch.GetResult();
+                //Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, std::get<Register>(ext_res.value), std::get<Register>(fetch_res.value), Temp::NewLabel());
+                ////Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, binop.GetResult().GetLabel(), fetch.GetResult().GetLabel(), Temp::NewLabel());
+                //builder.AddExp(ty_sz);
+                //builder.AddExp(binop);
+                //builder.AddExp(ext);
+                //builder.AddExp(fetch);
+                //builder.AddExp(binop2);
+                //ptr.base = binop2.GetResult().GetLabel();
+                //ptr.offset = 0;
             }
 
             auto& array_ty = *parray_ty;
             type = *array_ty.type;
         }
     }
-    return Address{type, ptr.base, ptr.offset};
+    //return Address{type, ptr.base, ptr.offset};
+    return Address{};
 }
 
 Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_Var& var, Builder& builder)
 {
-    auto symbol = table->find(var.name());
-    if (!symbol)
-    {
-        _ASSERT(false);
-    }
     if (auto psimple = std::get_if<Half_Var::SimpleVar>(&var.var))
     {
+        auto symbol = table->find(var.name());
+        auto s_ty = symbol.value().type.to_string();
+        auto addr_ty = symbol.value().addr.type.to_string();
+        if (!symbol)
+        {
+            printf("Symbol not found: %s\n", var.name().c_str());
+            _ASSERT(false);
+        }
         if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
         {
-            Half_Ir_FetchPtr fetch(symbol.value().addr);
-            builder.AddExp(fetch);
-            Half_Ir_GetElementPtr gep(std::get<Register>(fetch.GetResult().value));
-            gep.AddIndex(Half_Ir_Const(0));
+            //Half_Ir_FetchPtr fetch(symbol.value().addr);
+            //builder.AddExp(fetch);
+            //RealAddress addr = { fetch.GetResult().GetType(), fetch.GetResult().GetLabel(), 0 };;
+            //Address address(*pptr->type, std::make_shared<RealAddress>(addr), Temp::NewLabel());
+            RealAddress addr = { symbol.value().addr.type, symbol.value().addr.real_address->base, 0 };
+            Address address(symbol.value().type.type, std::make_shared<RealAddress>(addr), Temp::NewLabel());
+            Half_Ir_GetElementPtr gep(address);
             gep.result_element_type = *pptr->type;
             return gep;
         }
-        Half_Ir_GetElementPtr gep(symbol.value().addr);
+        if (auto parr = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
+        {
+            //Half_Ir_FetchPtr fetch(symbol.value().addr);
+            //builder.AddExp(fetch);
+            //RealAddress addr = { fetch.GetResult().GetType(), fetch.GetResult().GetLabel(), 0 };;
+            //Address address(*parr->type, std::make_shared<RealAddress>(addr), Temp::NewLabel());
+            RealAddress addr = { symbol.value().addr.type, symbol.value().addr.real_address->base, 0 };
+            Address address(symbol.value().type.type, std::make_shared<RealAddress>(addr), Temp::NewLabel());
+            Half_Ir_GetElementPtr gep(address);
+            gep.result_element_type = *parr->type;
+            return gep;
+        }
+        Address address = symbol.value().addr;
+        address.real_address = std::make_shared<RealAddress>(*address.real_address);
+        Half_Ir_GetElementPtr gep(address);
         gep.in_indexs.push_back(Half_Ir_Const(0));
         gep.result_element_type = symbol.value().type;
         return gep;
@@ -361,15 +415,7 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
     {
         auto& field = *pfield;
         Half_Ir_GetElementPtr get_ptr = Trans_LeftVar_Builder(table, *field.var, builder);
-        /*if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
-        {
-            get_ptr = Half_Ir_GetElementPtr(symbol.value().addr);
-        }
-        else
-        {
-            get_ptr = Trans_LeftVar_Builder(table, *field.var, builder);
-        }*/
-
+        auto symbol = table->find(var.name());
         if (auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&symbol.value().type.type))
         {
             auto& struct_ty = *pstruct_ty;
@@ -384,29 +430,26 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
     {
         auto& array = *parray;
         Half_Ir_GetElementPtr get_ptr = Trans_LeftVar_Builder(table, *array.var, builder);
-        /*if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
-        {
-            get_ptr = Half_Ir_GetElementPtr(symbol.value().addr);
-        }
-        else
-        {
-            get_ptr = Trans_LeftVar_Builder(table, *array.var, builder);
-        }*/
         auto idx = Trans_Expr(table, builder, *array.index);
         get_ptr.in_indexs.push_back(idx);
+
+        auto symbol = table->find(var.name());
         if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
         {
-            get_ptr.result_element_type = parray_ty->type;
+            get_ptr.result_element_type = *parray_ty->type;
+            get_ptr.out_address.type = *parray_ty->type;
             return get_ptr;
         }
         else if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
         {
             get_ptr.result_element_type = *pptr->type;
+            get_ptr.out_address.type = *pptr->type;
             return get_ptr;
         }
         get_ptr.result_element_type = Half_Type_Info::BasicType::BasicT::Invalid;
         return get_ptr;
     }
+    
     _ASSERT(false);
     return Half_Ir_GetElementPtr(Address{});
 }
@@ -497,16 +540,18 @@ Half_Ir_Name Trans_CondOp(std::shared_ptr<Table>& table, Builder& builder, Half_
     {
         auto& binop = *pop;
 
-        Temp::Label new_block_label = builder.GenBlockLabel(prefix + "_right");
+        Temp::Label new_block_label;
         Temp::Label left_true_label = true_label;
         Temp::Label left_false_label = false_label;
         if (binop.op == "&&")
         {
+            new_block_label = builder.GenBlockLabel(prefix + "_right");
             left_true_label = new_block_label;
             left_false_label = false_label;
         }
         else if (binop.op == "||")
         {
+            new_block_label = builder.GenBlockLabel(prefix + "_right");
             left_true_label = true_label;
             left_false_label = new_block_label;
         }
@@ -536,18 +581,18 @@ Half_Ir_Name Trans_CondOp(std::shared_ptr<Table>& table, Builder& builder, Half_
     return Half_Ir_Name();
 }
 
-Half_Ir_Name Trans_If_Cond(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& cond, std::string prefix, Temp::Label true_label, Temp::Label false_label)
+void Trans_If_Cond(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& cond, std::string prefix, Temp::Label true_label, Temp::Label false_label)
 {
     //  now it's support multiple conditions like (a < b && c > d)
     if (auto pop = std::get_if<std::shared_ptr<Half_Op>>(&cond.expr))
     {
         auto& op = **pop;
         Half_Op::Half_OpExpr temp_op = op;
-        return Trans_CondOp(table, builder, temp_op, prefix, true_label, false_label);
+        Trans_CondOp(table, builder, temp_op, prefix, true_label, false_label);
+        return;
     }
     printf("only support binary op exp type in if.cond\n");
     _ASSERT(false);
-    return Half_Ir_Name();
 }
 
 Value Trans_Expr(Half_Expr& expr, Builder& builder)
@@ -612,8 +657,8 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Let& let)
     for (size_t i = 0; i < s.type.GetSize() / 4; i++)
     {
         Address addr;
-        addr.offset = s.offset + i * 4;
-        addr.base = Temp::Label("bottom");
+        addr.real_address->offset = s.offset + i * 4;
+        addr.real_address->base = Temp::Label("bottom");
         addr.type = Half_Type_Info::BasicType::BasicT::Int;
         auto alloc = Half_Ir_Alloca(addr);
         builder.AddExp(builder.block_alloc_entry, alloc);
@@ -625,8 +670,22 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Let& let)
 
 Address Trans_Left_Var(std::shared_ptr<Table>& table, Builder& builder, Half_Var& var)
 {
+    if (auto psimple = std::get_if<Half_Var::SimpleVar>(&var.var))
+    {
+        auto symbol = table->find(var.name());
+        if (!symbol)
+        {
+            printf("Symbol not found: %s\n", var.name().c_str());
+            _ASSERT(false);
+        }
+        // auto ty = symbol.value().type;
+
+        return symbol.value().addr;
+    }
     auto get_ptr = Trans_LeftVar_Builder(table, var, builder);
-    return Trans_GetElementPtr(table, get_ptr, builder);
+    builder.AddExp(get_ptr);
+    return get_ptr.out_address;
+    //return Trans_GetElementPtr(table, get_ptr, builder);
 }
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Var& var)
@@ -831,9 +890,10 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Funcall& 
         auto arg = Trans_Funcall_Args(table, builder, funcall.args[i]);
         arg_exp[i] = arg.GetLabel();
     }
-    Half_Ir_Call call(Temp::NewLabel(), Temp::Label(funcall.name), arg_exp);
+    Register funcall_res = Register{ {}, Temp::NewLabel() };
+    Half_Ir_Call call(funcall_res, Temp::Label(funcall.name), arg_exp);
     builder.AddExp(call);
-    return Register{ {}, call.out_label };
+    return call.out_register;
 }
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_FuncDecl& funcDecl)
@@ -1135,4 +1195,37 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& exp
     return std::visit([&](auto&& arg) {
         return Trans_Expr(table, builder, *arg);
         }, expr.expr);
+}
+
+void Trans_Outer(Half_OuterExpr& outer, Builder& builder)
+{
+    auto table = std::make_shared<Table>();
+    Init_Basic_Type(table);
+    Trans_Outer(table, builder, outer);
+
+    // move strings in table to builder
+    for (auto& [l, s] : table->strings)
+    {
+        builder.InsertString(l, s);
+    }
+}
+
+void Trans_Outer(std::shared_ptr<Table>& table, Builder& builder, Half_OuterExpr& outer)
+{
+    if (auto pfunc = std::get_if<std::shared_ptr<Half_FuncDecl>>(&outer.expr))
+    {
+        Trans_Expr(table, builder, **pfunc);
+    }
+    else if (auto ptype = std::get_if<std::shared_ptr<Half_TypeDecl>>(&outer.expr))
+    {
+        Trans_Type(table, **ptype);
+    }
+    else if (auto pvec = std::get_if<std::shared_ptr<std::vector<Half_OuterExpr>>>(&outer.expr))
+    {
+        auto& vec = **pvec;
+        for (size_t i = 0; i < vec.size(); i++)
+        {
+            Trans_Outer(table, builder, vec[i]);
+        }
+    }
 }

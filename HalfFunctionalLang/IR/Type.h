@@ -44,12 +44,6 @@ struct Half_Type_Info
         TupleType(std::vector<T>& t) : type_list(t) {}
         std::vector<T> type_list;
     };
-    struct RenameType
-    {
-        RenameType(std::string n, std::shared_ptr<Half_Type_Info> t) : name(n), type(t) {}
-        std::string name;
-        std::shared_ptr<Half_Type_Info> type;
-    };
     struct ArrayType
     {
         ArrayType(std::shared_ptr<Half_Type_Info> t, size_t c) : type(t), count(c) {}
@@ -83,7 +77,7 @@ struct Half_Type_Info
         std::vector<std::shared_ptr<Half_Type_Info>> args;
         
     };
-    using Type = std::variant<BasicType, PointerType, TupleType, RenameType, ArrayType, StructType, FuncType>;
+    using Type = std::variant<BasicType, PointerType, TupleType,/* RenameType,*/ ArrayType, StructType, FuncType>;
     Type type;
     Half_Type_Info() = default;
     template<typename T>
@@ -91,6 +85,7 @@ struct Half_Type_Info
     Half_Type_Info(const Half_Type_Info& o) : type(o.type) {}
     bool is_pointer() const;
     bool is_basic() const;
+    std::string to_string() const;
 
     size_t GetSize();
 };

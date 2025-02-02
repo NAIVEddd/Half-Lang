@@ -38,11 +38,6 @@ size_t GetSize(Half_Type_Info::TupleType& type)
     return size;
 }
 
-size_t GetSize(Half_Type_Info::RenameType& type)
-{
-    return type.type->GetSize();
-}
-
 size_t GetSize(Half_Type_Info::ArrayType& type)
 {
     return type.count * type.type->GetSize();
@@ -71,6 +66,50 @@ bool Half_Type_Info::is_pointer() const
 bool Half_Type_Info::is_basic() const
 {
     return std::holds_alternative<Half_Type_Info::BasicType>(type);
+}
+
+std::string Half_Type_Info::to_string() const
+{
+    if (std::holds_alternative<Half_Type_Info::BasicType>(type))
+    {
+        auto& t = std::get<Half_Type_Info::BasicType>(type);
+        using BasicT = Half_Type_Info::BasicType::BasicT;
+        switch (t.type)
+        {
+        case BasicT::Char:
+            return "char";
+        case BasicT::Int:
+
+            return "int";
+        case BasicT::Float:
+            return "float";
+        case BasicT::String:
+            return "string";
+        default:
+            return "invalid";
+        }
+    }
+    else if (std::holds_alternative<Half_Type_Info::PointerType>(type))
+    {
+        return "pointer of " + std::get<Half_Type_Info::PointerType>(type).type->to_string();
+    }
+    else if (std::holds_alternative<Half_Type_Info::TupleType>(type))
+    {
+        return "tuple";
+    }
+    else if (std::holds_alternative<Half_Type_Info::ArrayType>(type))
+    {
+        return "array of " + std::get<Half_Type_Info::ArrayType>(type).type->to_string();
+    }
+    else if (std::holds_alternative<Half_Type_Info::StructType>(type))
+    {
+        return "struct " + std::get<Half_Type_Info::StructType>(type).name;
+    }
+    else if (std::holds_alternative<Half_Type_Info::FuncType>(type))
+    {
+        return "func " + std::get<Half_Type_Info::FuncType>(type).ret->to_string() + " (" + std::to_string(std::get<Half_Type_Info::FuncType>(type).args.size()) + " args)";
+    }
+    return std::string();
 }
 
 size_t Half_Type_Info::GetSize()

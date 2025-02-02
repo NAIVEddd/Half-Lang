@@ -1512,12 +1512,12 @@ end)";
             //auto e = pprogram(prog13);
             auto e = pprogram(prog11);
             _ASSERT(e.value().second.empty());
-            if (check.Check(e.value().first))
+            /*if (check.Check(e.value().first))
             {
                 printf("TypeCheck success\n");
-            }
+            }*/
 
-            auto ir_name = Trans_Expr(e.value().first, b);
+            Trans_Outer(e.value().first, b);
             printf("\nbuilder exprs count: %zd\n", b.blocks[0].exps.size());
             
             for (auto& block : b.blocks)
@@ -1635,6 +1635,6 @@ void test_ir()
         auto f1 = pprogram(prog1);
         _ASSERT(f1);
 
-        auto ir = Trans_Expr(f1.value().first, builder);
+        Trans_Outer(f1.value().first, builder);
     }
 }

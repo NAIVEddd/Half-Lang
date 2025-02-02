@@ -27,11 +27,23 @@ void Table::insert(Symbol& s)
     auto sz = s.type.GetSize();
     sz = sz ? sz : 4;
     total_size += sz;
-    s.addr.offset = stack->Alloc(sz);
+    RealAddress addr;
+    addr.base = Temp::Label("bottom");
+    addr.offset = stack->Alloc(sz);
+    addr.type = s.type;
+    if (!s.addr.real_address)
+    {
+        s.addr.real_address = std::make_shared<RealAddress>(addr);
+    }
+    else
+    {
+        s.addr.real_address->base = addr.base;
+        s.addr.real_address->offset = addr.offset;
+        s.addr.real_address->type = addr.type;
+    }
     s.addr.type = s.type;
-    s.addr.base = Temp::Label("bottom");
-    //s.offset = stack->Alloc(sz);
-    s.offset = s.addr.offset;
+    //addr.offset = s.addr.real_address->offset;
+    s.offset = s.addr.real_address->offset;
     values.insert({ s.name, s });
 }
 
@@ -97,10 +109,6 @@ std::optional<std::shared_ptr<Half_Type_Info>> Table::findType(std::string n, bo
 
     // get actual type
     auto& type = search->second;
-    while (auto prename = std::get_if<Half_Type_Info::RenameType>(&type->type))
-    {
-        type = prename->type;
-    }
 
     return type;
 }

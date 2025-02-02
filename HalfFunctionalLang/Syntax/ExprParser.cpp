@@ -1344,14 +1344,14 @@ Parser<Half_Expr> GetExprParser()
 			auto funcallparser = PipeExpr(pfuncall);
 			auto varparser = PipeExpr(pvar);
 			auto valueparser = PipeExpr(pvalue);
-			auto fundefparser = PipeExpr(pfuncdecl);
-            auto typeparser = PipeExpr(ptypedecl);
+			//auto fundefparser = PipeExpr(pfuncdecl);
+            //auto typeparser = PipeExpr(ptypedecl);
             auto structinitparser = PipeExpr(pstructinitbody);
             auto arrayinitparser = PipeExpr(parrayinit);
             auto arraynewparser = PipeExpr(parraynew);
 
 			auto c = Choice(std::vector{
-				fundefparser, typeparser,
+				//fundefparser, typeparser,
 				letparser, assignparser, ifparser, forparser, whileparser,
                 opparser, structinitparser, arrayinitparser, arraynewparser,
 				funcallparser, varparser, valueparser, });
@@ -1372,7 +1372,36 @@ ParserResult<Half_Expr> pexpr(ParserInput s)
 	return parser(s);
 }
 
-ParserResult<Half_Expr> pprogram(ParserInput s)
+ParserResult<Half_OuterExpr> pmanyouterexpr(ParserInput s)
 {
-	return pmanyexpr(s);
+	static auto exprparser = PipeOuterExpr(Many1(pouterexpr));
+	return exprparser(s);
+}
+
+Parser<Half_OuterExpr> GetOuterExprParser()
+{
+    return [](ParserInput s) ->ParserResult<Half_OuterExpr>
+        {
+            auto fundefparser = PipeOuterExpr(pfuncdecl);
+            auto typeparser = PipeOuterExpr(ptypedecl);
+            auto c = Choice(std::vector{fundefparser, typeparser });
+            auto r = c(s);
+            if (!r)
+            {
+                return std::nullopt;
+            }
+            s = r.value().second;
+            return std::make_pair(r.value().first, s);
+        };
+}
+
+ParserResult<Half_OuterExpr> pouterexpr(ParserInput s)
+{
+    static auto parser = GetOuterExprParser();
+    return parser(s);
+}
+
+ParserResult<Half_OuterExpr> pprogram(ParserInput s)
+{
+	return pmanyouterexpr(s);
 }

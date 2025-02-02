@@ -73,19 +73,52 @@ enum class Half_AddressSpace
     StackBottom,
 };
 
+struct RealAddress
+{
+    // this is a element type,
+    //  if it is a int, load 4 bytes from memory.
+    //  if it is a pointer, load 8 bytes from memory
+    Half_Type_Info type;
+    Temp::Label base;
+    ptrdiff_t offset;
+};
+
 struct Address
 {   // format as offset(base)
     Half_Type_Info type;    // TODO : is this a element type or a pointer type
-    Temp::Label base;
-    ptrdiff_t offset;
+    std::shared_ptr<RealAddress> real_address;
+    Temp::Label reg;
+
+    Address()
+    {
+        type = Half_Type_Info::BasicType::BasicT::Invalid;
+        real_address = std::make_shared<RealAddress>();
+        real_address->base = Temp::Label("bottom");
+        real_address->offset = 0;
+    }
+    Address(Half_Type_Info t, std::shared_ptr<RealAddress> r, Temp::Label l = Temp::NewLabel())
+        : type(t), real_address(r), reg(l) {
+    }
+    Address(const Address& a)
+    {
+        type = a.type;
+        real_address = a.real_address;
+        reg = a.reg;
+    }
     bool operator<(const Address& a) const
     {
-        return base.l < a.base.l || (base.l == a.base.l && offset < a.offset);
+        if (real_address && a.real_address)
+        {
+            return real_address->base.l < a.real_address->base.l ||
+                ( real_address->base.l == a.real_address->base.l && real_address->offset < a.real_address->offset);
+        }
+        _ASSERT(false);
+        return false;
     }
     bool operator==(const Address& a) const
     {
         // type == a.type &&
-        return  base.l == a.base.l && offset == a.offset;
+        return  real_address->base.l == a.real_address->base.l && real_address->offset == a.real_address->offset;
     }
 };
 struct Register
@@ -113,7 +146,7 @@ struct Value
     {
         if (std::holds_alternative<Address>(value))
         {
-            return std::get<Address>(value).base;
+            return std::get<Address>(value).real_address->base;
         }
         else if (std::holds_alternative<Register>(value))
         {
@@ -125,7 +158,7 @@ struct Value
     {
         if (std::holds_alternative<Address>(value))
         {
-            std::get<Address>(value).base = l;
+            std::get<Address>(value).real_address->base = l;
         }
         else if (std::holds_alternative<Register>(value))
         {
@@ -176,15 +209,20 @@ struct Half_Ir_Store
 // extend value to a larger size
 struct Half_Ir_Ext
 {
-    Value value;
-    Half_Type_Info type;
-    Temp::Label out_label;
-    Half_Ir_Ext(Value v, Half_Type_Info t, Temp::Label l = Temp::NewLabel())
-        : value(v), type(t), out_label(l) {}
-    Half_Ir_Ext(const Half_Ir_Ext& e) : value(e.value), type(e.type), out_label(e.out_label) {}
+    Register value;
+    Register out_register;
+    Half_Ir_Ext(Register v, Half_Type_Info t, Temp::Label l = Temp::NewLabel())
+        : value(v)
+    {
+        out_register = Register{ t, l };
+    }
+    Half_Ir_Ext(const Half_Ir_Ext& e) : value(e.value)
+    {
+        out_register = e.out_register;
+    }
     Value GetResult() const
     {
-        return Value(Register{ type, out_label });
+        return Value(out_register);
     }
 };
 
@@ -215,35 +253,29 @@ struct Half_Ir_Const
 struct Half_Ir_GetElementPtr
 {
     using Indexer = std::variant<Half_Ir_Const, Value>;
+    Address out_address;
     ptrdiff_t offset = 0;
     Temp::Label base;
     Half_Type_Info source_element_type;
     Half_Type_Info result_element_type;
     std::vector<Indexer> in_indexs;
-    std::vector<size_t> elem_sizes;
-    std::vector<Half_Ir_Exp> in_index;
-    std::vector<Temp::Label> exp_out_labels;
+    //std::vector<size_t> elem_sizes;
+    //std::vector<Half_Ir_Exp> in_index;
+    //std::vector<Temp::Label> exp_out_labels;
     Temp::Label out_label;
-    Half_Ir_GetElementPtr() = default;
-    Half_Ir_GetElementPtr(Temp::Label b, Temp::Label l = Temp::NewLabel())
-        : base(b), out_label(l) {}
+    //Half_Ir_GetElementPtr() = default;
     Half_Ir_GetElementPtr(Address a, Temp::Label l = Temp::NewLabel())
-        : offset(a.offset), base(a.base), out_label(l)
-        , source_element_type(Half_Type_Info::PointerType(a.type))
+        : out_address(a), out_label(l)
+        , source_element_type(a.type)
     {
         result_element_type = source_element_type;
     }
-    Half_Ir_GetElementPtr(Register reg, Temp::Label l = Temp::NewLabel())
+    /*Half_Ir_GetElementPtr(Register reg, Temp::Label l = Temp::NewLabel())
         : offset(0), base(reg.reg), out_label(l)
         , source_element_type(reg.type)
     {
         result_element_type = source_element_type;
-    }
-    Half_Ir_GetElementPtr(const Half_Ir_GetElementPtr& g)
-        : offset(g.offset), base(g.base)
-        , source_element_type(g.source_element_type), result_element_type(g.result_element_type)
-        , in_indexs(g.in_indexs), elem_sizes(g.elem_sizes), in_index(g.in_index), exp_out_labels(g.exp_out_labels), out_label(g.out_label) {
-    }
+    }*/
 
     void AddIndex(Indexer idx)
     {
@@ -261,7 +293,7 @@ struct Half_Ir_GetElementPtr
         return Address{ Half_Type_Info::BasicType::BasicT::Int, out_label, offset };
     }*/
 
-    size_t GetOffset() const
+    /*size_t GetOffset() const
     {
         _ASSERT(elem_sizes.size() == in_index.size());
         if (!is_const_offset())
@@ -277,8 +309,8 @@ struct Half_Ir_GetElementPtr
             }
         }
         return sz;
-    }
-    bool is_const_offset() const
+    }*/
+    /*bool is_const_offset() const
     {
         if (in_index.empty())
         {
@@ -293,7 +325,7 @@ struct Half_Ir_GetElementPtr
             return false;
         }
         return true;
-    }
+    }*/
 };
 
 struct Half_Ir_FetchPtr
@@ -487,13 +519,11 @@ struct Half_Ir_Compare
 
 struct Half_Ir_Call
 {
+    Register out_register;
     Temp::Label fun_name;
     std::vector<Half_Ir_Name> args;
-    Temp::Label out_label;
-    Half_Ir_Call(Temp::Label call_label, Temp::Label n, std::vector<Half_Ir_Name>& a)
-        : fun_name(n), args(a), out_label(call_label) {}
-    Half_Ir_Call(const Half_Ir_Call& c)
-        : fun_name(c.fun_name), args(c.args), out_label(c.out_label) {}
+    Half_Ir_Call(Register r, Temp::Label n, std::vector<Half_Ir_Name>& a)
+        : out_register(r), fun_name(n), args(a) {}
 };
 
 struct Half_Ir_Label
@@ -545,17 +575,4 @@ struct Half_Ir_Move
     Half_Type_Info type;
     Half_Ir_Move(Half_Ir_Exp l, Half_Ir_Exp r)
         :left(l), right(r) {}
-};
-
-struct Half_IR
-{
-    using IR = std::variant<
-        std::monostate,
-        Half_Ir_Exp
-    >;
-    IR ir;
-
-    Half_IR() = default;
-    template<typename T>
-    Half_IR(T t) : ir(t) {}
 };

@@ -388,7 +388,7 @@ void Mem2RegPass::Run(Half_Ir_Function &program)
     for (size_t i = 0; i < mup.allocs.size(); i++)
     {
         auto& addr = mup.allocs[i];
-        auto str = addr.base.l + "(" + std::to_string(addr.offset) + ")";
+        auto str = addr.real_address->base.l + "(" + std::to_string(addr.real_address->offset) + ")";
         printf("alloc at %s, var_id %zd\n", str.c_str(), i);
     }
     for(auto& [i, j, v] : mup.loads)

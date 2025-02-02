@@ -6,12 +6,20 @@
 
 ParserResult<Half_Expr> pmanyexpr(ParserInput s);
 ParserResult<Half_Expr> pexpr(ParserInput s);
-ParserResult<Half_Expr> pprogram(ParserInput s);
+ParserResult<Half_OuterExpr> pmanyouterexpr(ParserInput s);
+ParserResult<Half_OuterExpr> pouterexpr(ParserInput s);
+ParserResult<Half_OuterExpr> pprogram(ParserInput s);
 
 template<typename A>
 Half_Expr ConvertToExpr(A a)
 {
 	return std::move(Half_Expr(a));
+}
+
+template<typename A>
+Half_OuterExpr ConverterToOuterExpr(A t)
+{
+    return Half_OuterExpr(t);
 }
 
 template<typename T, typename A = ParserResult_t<T>>
@@ -22,6 +30,16 @@ Parser<Half_Expr> PipeExpr(T t)
 			auto p = Pipe<T, Half_Expr>(t, (Converter<A, Half_Expr>) ConvertToExpr<A>);
 			return p(s);
 		};
+}
+
+template<typename T, typename A = ParserResult_t<T>>
+Parser<Half_OuterExpr> PipeOuterExpr(T t)
+{
+    return [=](ParserInput s) -> ParserResult<Half_OuterExpr>
+        {
+            auto p = Pipe<T, Half_OuterExpr>(t, (Converter<A, Half_OuterExpr>) ConverterToOuterExpr<A>);
+            return p(s);
+        };
 }
 
 /// <summary>

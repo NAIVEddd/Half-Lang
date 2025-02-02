@@ -1,0 +1,7 @@
+type int_arr = array of int
+function swap(arr int_arr, i int, j int) : int =
+    let t = arr[i]
+    arr[i] = arr[j]
+    arr[j] = t
+    0
+end

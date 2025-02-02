@@ -1,3 +1,7 @@
+param (
+    [bool]$Debug = $false
+)
+
 Copy-Item -Path "..\x64\Debug\HalfFunctionalLang.exe" -Destination "./" -Force
 
 function Compiling {
@@ -11,11 +15,19 @@ function Compiling {
 
     if ($file_name -match "main") {
         .\HalfFunctionalLang.exe $file_name -o $ass_name
-        clang++ $ass_name -o $exe_name
+        if ($Debug) {
+            clang++ $ass_name -g -o $exe_name
+        } else {
+            clang++ $ass_name -o $exe_name
+        }
     } else {
         $cpp_name = "test_" + $file_name -replace ".half", ".cpp"
         .\HalfFunctionalLang.exe $file_name -o $ass_name
-        clang++ $ass_name $cpp_name -o $exe_name
+        if ($Debug) {
+            clang++ $ass_name $cpp_name -g -o $exe_name
+        } else {
+            clang++ $ass_name $cpp_name -o $exe_name
+        }
     }
     return $exe_name
 }
@@ -42,8 +54,12 @@ foreach ($file in $halfFiles) {
     Run-Test $exe_name
 }
 
-Remove-Item -path "*.exe" -Force
-Remove-Item -path "*.s" -Force
-Remove-Item -path "*.o" -Force
-Remove-Item -path "*.ilk" -Force
-Remove-Item -path "*.pdb" -Force
+if (-not $Debug) {
+    Remove-Item -path "*.exe" -Force
+    Remove-Item -path "*.s" -Force
+    Remove-Item -path "*.o" -Force
+    Remove-Item -path "*.ilk" -Force
+    Remove-Item -path "*.pdb" -Force
+}else {
+    Remove-Item -path "HalfFunctionalLang.exe" -Force
+}

@@ -20,6 +20,7 @@ const std::set<std::string> Keyword =
 };
 
 
+struct Half_OuterExpr;
 struct Half_Expr;
 struct Half_Var;
 struct Half_Value;
@@ -53,6 +54,23 @@ struct Half_TypeDecl;
 // return statement (type, value) // maybe not needed
 
 
+
+struct Half_OuterExpr
+{
+    using Expr_T = std::variant<
+        std::shared_ptr<Half_FuncDecl>,
+        std::shared_ptr<Half_TypeDecl>,
+        std::shared_ptr<std::vector<Half_OuterExpr>>>;
+
+    Half_OuterExpr() = default;
+    template<typename T>
+    Half_OuterExpr(const T& t) : expr(std::make_shared<T>(t)) {}
+    template<typename T>
+    Half_OuterExpr(std::shared_ptr<T>& p) : expr(p) {}
+
+    Expr_T expr;
+};
+
 struct Half_Expr
 {
     using Expr = std::variant<
@@ -68,8 +86,6 @@ struct Half_Expr
         std::shared_ptr<Half_If>,
         std::shared_ptr<Half_For>,
         std::shared_ptr<Half_While>,
-        std::shared_ptr<Half_FuncDecl>,
-        std::shared_ptr<Half_TypeDecl>,
         std::shared_ptr<std::vector<Half_Expr>>>;
 
     Half_Expr() = default;
