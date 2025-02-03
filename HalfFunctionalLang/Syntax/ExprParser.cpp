@@ -163,13 +163,6 @@ ParserResult<std::string> ptypename(ParserInput s)
 		};
 	auto pname = Pipe2(head, tail, tostring);
 	auto n = pname(s);
-	//if (Keyword.contains(n.value().first))
-	//{
-	//	// print error message, row and col
-	//	printf("Error: %s is a keyword\n", n.value().first.c_str());
-	//	printf("    At Line: %zd, Col: %zd\n", s.current_pos.line, s.current_pos.column);
- //       return std::nullopt;
-	//}
 
 	if (!n)
 	{
@@ -703,34 +696,7 @@ ParserResult<Half_TypeDecl::Nil> pniltype(ParserInput s)
 	}
 	return std::make_pair(Half_TypeDecl::Nil(), rnil.value().second);
 }
-// ParserResult<Half_TypeDecl::RenameType> prenametype(ParserInput s)
-// {
-// 	auto space = Spaces();
-// 	auto keytype = Between(space, space, String("type"));
-// 	auto rtype = keytype(s);
-// 	if (!rtype)
-// 	{
-// 		return std::nullopt;
-// 	}
-// 	s = rtype.value().second;
 
-// 	auto keyequal = Between(space, space, OneChar('='));
-// 	auto requal = keyequal(s);
-// 	if (!requal)
-// 	{
-// 		return std::nullopt;
-// 	}
-// 	s = requal.value().second;
-
-// 	auto keyname = pvariablename;
-// 	auto rname = keyname(s);
-// 	if (!rname)
-// 	{
-// 		return std::nullopt;
-// 	}
-// 	return std::make_pair(Half_TypeDecl::RenameType(rname.value().first), rname.value().second);
-// }
-// ParserResult<Half_TypeDecl::TupleType> ptupletype(ParserInput s);
 ParserResult<Half_TypeDecl::Additional> padditionaltype(ParserInput s)
 {
 	auto space = Spaces();
@@ -1344,14 +1310,11 @@ Parser<Half_Expr> GetExprParser()
 			auto funcallparser = PipeExpr(pfuncall);
 			auto varparser = PipeExpr(pvar);
 			auto valueparser = PipeExpr(pvalue);
-			//auto fundefparser = PipeExpr(pfuncdecl);
-            //auto typeparser = PipeExpr(ptypedecl);
             auto structinitparser = PipeExpr(pstructinitbody);
             auto arrayinitparser = PipeExpr(parrayinit);
             auto arraynewparser = PipeExpr(parraynew);
 
 			auto c = Choice(std::vector{
-				//fundefparser, typeparser,
 				letparser, assignparser, ifparser, forparser, whileparser,
                 opparser, structinitparser, arrayinitparser, arraynewparser,
 				funcallparser, varparser, valueparser, });

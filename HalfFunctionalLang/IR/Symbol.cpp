@@ -4,8 +4,6 @@ Table::~Table()
 {
     if (stack)
     {
-        // TODO: release the stack, value size is not always 4
-        //stack->Release(values.size() * 4);
         stack->Release(total_size);
     }
 }
@@ -42,7 +40,6 @@ void Table::insert(Symbol& s)
         s.addr.real_address->type = addr.type;
     }
     s.addr.type = s.type;
-    //addr.offset = s.addr.real_address->offset;
     s.offset = s.addr.real_address->offset;
     values.insert({ s.name, s });
 }

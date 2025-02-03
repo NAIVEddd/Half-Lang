@@ -157,23 +157,10 @@ void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs)
 void Munch_GetElementPtr(const Half_Ir_GetElementPtr& exp, std::vector<AS_Instr>& instrs)
 {
     Half_Type_Info type = exp.source_element_type;// exp.out_address.real_address->type;
-    auto n = type.to_string();
     auto& real_addr = exp.out_address.real_address;
     for (size_t i = 0; i < exp.in_indexs.size(); i++)
     {
         auto& in = exp.in_indexs[i];
-        if (auto pconst = std::get_if<Half_Ir_Const>(&in))
-        {
-            n += "[" + std::to_string((pconst)->n) + "]";
-        }
-        else if (auto pvar = std::get_if<Value>(&in))
-        {
-            n += "{" + (pvar)->GetLabel().l + "}";
-        }
-        else
-        {
-            _ASSERT(false);
-        }
         if (auto p = std::get_if<Half_Type_Info::ArrayType>(&type.type))
         {
             type = *p->type;
@@ -227,17 +214,12 @@ void Munch_GetElementPtr(const Half_Ir_GetElementPtr& exp, std::vector<AS_Instr>
                 RealAddress addr = { type, real_addr->base, real_addr->offset };
                 Half_Ir_Load load(Address{ real_addr->type, std::make_shared<RealAddress>(addr), Temp::NewLabel()});
 
-                //printf("%s\n", load.out_register.type.to_string().c_str());
-                //printf("%zd(%s) %s\n", real_addr->offset, real_addr->base.l.c_str(), real_addr->type.to_string().c_str());
                 auto ext_res = ext.GetResult();
-                //auto fetch_res = fetch.GetResult();
-                //Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, std::get<Register>(ext_res.value), std::get<Register>(fetch_res.value), Temp::NewLabel());
                 auto load_res = load.GetResult();
                 Half_Ir_BinOp binop2(Half_Ir_BinOp::Oper::Plus, std::get<Register>(ext_res.value), std::get<Register>(load_res.value), Temp::NewLabel());
                 MunchExp_llvmlike(Half_Ir_Exp(ty_sz), instrs);
                 MunchExp_llvmlike(Half_Ir_Exp(binop), instrs);
                 MunchExp_llvmlike(Half_Ir_Exp(ext), instrs);
-                //MunchExp_llvmlike(Half_Ir_Exp(fetch), instrs);
                 MunchExp_llvmlike(Half_Ir_Exp(load), instrs);
                 MunchExp_llvmlike(Half_Ir_Exp(binop2), instrs);
                 real_addr->base = binop2.GetResult().GetLabel();
@@ -251,7 +233,6 @@ void Munch_GetElementPtr(const Half_Ir_GetElementPtr& exp, std::vector<AS_Instr>
             type = p->GetField(idx.n).type;
         }
     }
-    //printf("munch type :%s\n", n.c_str());
 }
 
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
@@ -264,11 +245,6 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     }
     else if (auto pstore = std::get_if<std::shared_ptr<Half_Ir_Store>>(&exp.exp))
     {
-        //auto real_addr = (*pstore)->address.real_address;
-        //auto base_l = real_addr->base.l;
-        //auto reg = base_l == "bottom" ? "(%rsp)"
-        //    : (base_l == "top" ? "(%rbp)" : "(" + base_l + ")");
-        //auto l = Temp::Label(std::to_string(real_addr->offset) + reg);
         AS_Move_Type move((*pstore)->address, (*pstore)->value);
         instrs.push_back(move);
         return;
@@ -400,26 +376,6 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     else if (auto pgetptr = std::get_if<std::shared_ptr<Half_Ir_GetElementPtr>>(&exp.exp))
     {
         Munch_GetElementPtr(**pgetptr, instrs);
-        /*auto& getptr = **pgetptr;
-        std::vector<Temp::Label> offsets;
-        for (size_t i = 0; i < getptr.in_index.size(); ++i)
-        {
-            MunchExp_llvmlike(getptr.in_index[i], instrs);
-            Half_Ir_Const c(getptr.elem_sizes[i]);
-            MunchExp_llvmlike(Half_Ir_Exp(c), instrs);
-            Temp::Label offset = Temp::NewLabel();
-            Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Multy, getptr.exp_out_labels[i], c.out_label, offset);
-            MunchExp_llvmlike(Half_Ir_Exp(binop), instrs);
-            offsets.push_back(offset);
-        }
-        if (offsets.size() == 1)
-        {
-            Temp::Label base = Temp::NewLabel();
-            instrs.push_back(AS_ElemPtr(getptr.offset, Temp::Label("%rsp"), base));
-            Half_Ir_BinOp binop(Half_Ir_BinOp::Oper::Plus, base, offsets[0], Temp::NewLabel());
-            MunchExp_llvmlike(Half_Ir_Exp(binop), instrs);
-            instrs.push_back(AS_ElemPtr(0, binop.out_label, getptr.out_label));
-        }*/
         return;
     }
     else if (auto pfetch = std::get_if<std::shared_ptr<Half_Ir_FetchPtr>>(&exp.exp))
@@ -431,7 +387,7 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         auto l = Temp::Label(reg);
         auto offset = fetch.ptr.real_address->offset;
         AS_Lea lea(fetch.out_label, l, offset);
-        instrs.push_back(lea);/**/
+        instrs.push_back(lea);
         return;
     }
     else if (auto pop = std::get_if<std::shared_ptr<Half_Ir_BinOp>>(&exp.exp))
@@ -751,8 +707,6 @@ inline std::string to_string(const AS_Move_Type& mv)
     {
         _ASSERT(false);
     }
-    //auto src = mv.src.GetLabel().l.starts_with('e') ? "%" + mv.src.GetLabel().l : mv.src.GetLabel().l;
-    //auto dst = mv.dst.GetLabel().l.starts_with('e') ? "%" + mv.dst.GetLabel().l : mv.dst.GetLabel().l;
     return std::string("movl ") + src + ", " + dst + "\n";
 }
 inline std::string to_string(const AS_Lea& lea)
@@ -814,10 +768,6 @@ inline std::string to_string(const AS_Label& lab)
 inline std::string to_string(const AS_Call& call)
 {
     std::string str;
-    /*for (size_t i = 0; i < call.args.size(); i++)
-    {
-        str += "pushq %" + call.args[i].l + "\n";
-    }*/
     return str + "call " + call.fun_name.l + "\n";
 }
 inline std::string to_string(const AS_Return& ret)

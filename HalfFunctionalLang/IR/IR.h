@@ -259,23 +259,13 @@ struct Half_Ir_GetElementPtr
     Half_Type_Info source_element_type;
     Half_Type_Info result_element_type;
     std::vector<Indexer> in_indexs;
-    //std::vector<size_t> elem_sizes;
-    //std::vector<Half_Ir_Exp> in_index;
-    //std::vector<Temp::Label> exp_out_labels;
     Temp::Label out_label;
-    //Half_Ir_GetElementPtr() = default;
     Half_Ir_GetElementPtr(Address a, Temp::Label l = Temp::NewLabel())
         : out_address(a), out_label(l)
         , source_element_type(a.type)
     {
         result_element_type = source_element_type;
     }
-    /*Half_Ir_GetElementPtr(Register reg, Temp::Label l = Temp::NewLabel())
-        : offset(0), base(reg.reg), out_label(l)
-        , source_element_type(reg.type)
-    {
-        result_element_type = source_element_type;
-    }*/
 
     void AddIndex(Indexer idx)
     {
@@ -287,45 +277,6 @@ struct Half_Ir_GetElementPtr
 
         return result_element_type;
     }
-
-    /*Address GetResult() const
-    {
-        return Address{ Half_Type_Info::BasicType::BasicT::Int, out_label, offset };
-    }*/
-
-    /*size_t GetOffset() const
-    {
-        _ASSERT(elem_sizes.size() == in_index.size());
-        if (!is_const_offset())
-        {
-            return -1;
-        }
-        ptrdiff_t sz = offset;
-        for (size_t i = 0; i < elem_sizes.size(); i++)
-        {
-            if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&in_index[i].exp))
-            {
-                sz += elem_sizes[i] * (*pconst)->n;
-            }
-        }
-        return sz;
-    }*/
-    /*bool is_const_offset() const
-    {
-        if (in_index.empty())
-        {
-            return true;
-        }
-        for (size_t i = 0; i < in_index.size(); i++)
-        {
-            if (auto pconst = std::get_if<std::shared_ptr<Half_Ir_Const>>(&in_index[i].exp))
-            {
-                continue;
-            }
-            return false;
-        }
-        return true;
-    }*/
 };
 
 struct Half_Ir_FetchPtr
@@ -431,12 +382,10 @@ struct Half_Ir_BinOp
         if (left.type.is_pointer() && right.type.is_basic())
         {
             return Value(Register{ left.type, out_label });
-            //return Value(Address{ left.type, left.reg, 0 });
         }
         else if (left.type.is_basic() && right.type.is_pointer())
         {
             return Value(Register{ right.type, out_label });
-            //return Value(Address{ right.type, right.reg, 0 });
         }
         else if (left.type.is_basic() && right.type.is_basic())
         {
