@@ -90,6 +90,35 @@ Half_Var::Half_Var(const Half_Var& v)
 {
 }
 
+std::string Half_Var::to_string() const
+{
+    if(auto pvar = std::get_if<SimpleVar>(&var))
+    {
+        return pvar->id;
+    }
+    else if(auto pvar = std::get_if<FieldVar>(&var))
+    {
+        return pvar->var->to_string() + "." + pvar->id;
+    }
+    else if(auto pvar = std::get_if<SubscriptVar>(&var))
+    {
+        std::string index_str;
+        if (auto pidx_var = std::get_if<std::shared_ptr<Half_Var>>(&pvar->index->expr))
+        {
+            index_str = (*pidx_var)->to_string();
+        }
+        else if (auto pidx_const = std::get_if<std::shared_ptr<Half_Value>>(&pvar->index->expr))
+        {
+            if(auto pconst = std::get_if<int>(&(*pidx_const)->value))
+            {
+                index_str = std::to_string(*pconst);
+            }
+        }
+        return pvar->var->to_string() + "[" + index_str + "]";
+    }
+    return std::string();
+}
+
 Half_Var& Half_Var::operator=(const Half_Var& v)
 {
     var = v.var;

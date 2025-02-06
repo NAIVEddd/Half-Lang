@@ -1,0 +1,46 @@
+type int_array = array of int
+
+type point2 =
+{
+    x:int,
+    y:int
+}
+type point3 =
+{
+    x:int,
+    y:int,
+    z:int
+}
+
+type p2_ptr = ptr of point2
+type p3_ptr = ptr of point3
+type p2_array = array of point2[20]
+type p3_array = array of point3[20]
+
+function swap_p2(arr p2_ptr, i int, j int) : int =
+    let x = arr[i].x
+    arr[i].x = arr[j].x
+    arr[j].x = x
+
+    let y = arr[i].y
+    arr[i].y = arr[j].y
+    arr[j].y = y
+
+    0
+end
+
+function swap_p3(arr p3_ptr, i int, j int) : int =
+    let x = arr[i].x
+    arr[i].x = arr[j].x
+    arr[j].x = x
+
+    let y = arr[i].y
+    arr[i].y = arr[j].y
+    arr[j].y = y
+
+    let z = arr[i].z
+    arr[i].z = arr[j].z
+    arr[j].z = z
+
+    0
+end

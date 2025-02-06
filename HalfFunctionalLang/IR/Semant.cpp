@@ -55,7 +55,10 @@ Half_Type_Info Get_Expr_Type(std::shared_ptr<Table>& table, Half_Expr& expr)
             auto& field = *pfield;
             auto& sym = opt_sym.value();
             auto& type = sym.type;
-            if (auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&type.type))
+            auto tmp_expr = Half_Expr();
+            tmp_expr.expr = field.var;
+            auto var_ty = Get_Expr_Type(table, tmp_expr);
+            if (auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&var_ty.type))
             {
                 auto& struct_ty = *pstruct_ty;
                 auto& struct_field = struct_ty.GetField(field.id);
@@ -246,7 +249,7 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
         }
         if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
         {
-            RealAddress addr = { symbol.value().addr.type, symbol.value().addr.real_address->base, 0 };
+            RealAddress addr = { symbol.value().addr.target_type, symbol.value().addr.real_address->base, 0 };
             Address address(symbol.value().type.type, std::make_shared<RealAddress>(addr), Temp::NewLabel());
             Half_Ir_GetElementPtr gep(address);
             gep.result_element_type = *pptr->type;
@@ -254,7 +257,7 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
         }
         if (auto parr = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
         {
-            RealAddress addr = { symbol.value().addr.type, symbol.value().addr.real_address->base, 0 };
+            RealAddress addr = { symbol.value().addr.target_type, symbol.value().addr.real_address->base, 0 };
             Address address(symbol.value().type.type, std::make_shared<RealAddress>(addr), Temp::NewLabel());
             Half_Ir_GetElementPtr gep(address);
             gep.result_element_type = *parr->type;
@@ -271,14 +274,17 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
     {
         auto& field = *pfield;
         Half_Ir_GetElementPtr get_ptr = Trans_LeftVar_Builder(table, *field.var, builder);
-        auto symbol = table->find(var.name());
-        if (auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&symbol.value().type.type))
+        auto sym_type = get_ptr.result_element_type;
+        if (auto pstruct_ty = std::get_if<Half_Type_Info::StructType>(&sym_type.type))
         {
             auto& struct_ty = *pstruct_ty;
             get_ptr.in_indexs.push_back(Half_Ir_Const((int)struct_ty.GetFieldIndex(field.id)));
-            get_ptr.result_element_type = struct_ty.GetField(field.id).type;
+            get_ptr.result_element_type = *struct_ty.GetField(field.id).type;
+            get_ptr.out_address.target_type = *struct_ty.GetField(field.id).type;
             return get_ptr;
         }
+        // TODO: if sym_type is a pointer type of struct, then get the struct type
+        _ASSERT(false);
         get_ptr.result_element_type = Half_Type_Info::BasicType::BasicT::Invalid;
         return get_ptr;
     }
@@ -293,13 +299,13 @@ Half_Ir_GetElementPtr Trans_LeftVar_Builder(std::shared_ptr<Table>& table, Half_
         if (auto parray_ty = std::get_if<Half_Type_Info::ArrayType>(&symbol.value().type.type))
         {
             get_ptr.result_element_type = *parray_ty->type;
-            get_ptr.out_address.type = *parray_ty->type;
+            get_ptr.out_address.target_type = *parray_ty->type;
             return get_ptr;
         }
         else if (auto pptr = std::get_if<Half_Type_Info::PointerType>(&symbol.value().type.type))
         {
             get_ptr.result_element_type = *pptr->type;
-            get_ptr.out_address.type = *pptr->type;
+            get_ptr.out_address.target_type = *pptr->type;
             return get_ptr;
         }
         get_ptr.result_element_type = Half_Type_Info::BasicType::BasicT::Invalid;
@@ -364,7 +370,7 @@ Value Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builder& buil
     {
         // impossible
         _ASSERT(false);
-        paddr->type = type;
+        paddr->target_type = type;
     }
     return res;
 }
@@ -515,7 +521,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Let& let)
         Address addr;
         addr.real_address->offset = s.offset + i * 4;
         addr.real_address->base = Temp::Label("bottom");
-        addr.type = Half_Type_Info::BasicType::BasicT::Int;
+        addr.target_type = Half_Type_Info::BasicType::BasicT::Int;
         auto alloc = Half_Ir_Alloca(addr);
         builder.AddExp(builder.block_alloc_entry, alloc);
     }
@@ -538,6 +544,18 @@ Address Trans_Left_Var(std::shared_ptr<Table>& table, Builder& builder, Half_Var
         return symbol.value().addr;
     }
     auto get_ptr = Trans_LeftVar_Builder(table, var, builder);
+    /*printf("%s elem_ptr_type : %s, address type : %s, real_address type : %s\n",
+        var.to_string().c_str(),
+        get_ptr.result_element_type.to_string().c_str(),
+        get_ptr.out_address.target_type.to_string().c_str(),
+        get_ptr.out_address.real_address->type.to_string().c_str());*/
+    //get_ptr.out_address.real_address->type = get_ptr.result_element_type;
+    //get_ptr.out_address.target_type = get_ptr.result_element_type;
+    /*printf("%s elem_ptr_type : %s, address type : %s, real_address type : %s\n",
+        var.to_string().c_str(),
+        get_ptr.result_element_type.to_string().c_str(),
+        get_ptr.out_address.type.to_string().c_str(),
+        get_ptr.out_address.real_address->type.to_string().c_str());*/
     builder.AddExp(get_ptr);
     return get_ptr.out_address;
 }

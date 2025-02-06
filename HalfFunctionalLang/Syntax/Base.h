@@ -159,6 +159,7 @@ struct Half_Var
     Half_Var(FieldVar&& v);
     Half_Var(SubscriptVar&& v);
     Half_Var(const Half_Var& v);
+    std::string to_string() const;
     Half_Var& operator=(const Half_Var& v);
     std::string name() const;
     bool operator<(const Half_Var& other) const {

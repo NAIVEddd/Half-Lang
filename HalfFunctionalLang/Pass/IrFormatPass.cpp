@@ -99,7 +99,7 @@ void IR_Print_Pass::RunOn(Half_Ir_Alloca& alloc)
 {
     std::string line = std::string(indent, ' ') + "alloca at ";
     line += alloc.out_address.real_address->base.l + " offset " + std::to_string(alloc.out_address.real_address->offset);
-    line += " size " + std::to_string(alloc.out_address.type.GetSize());
+    line += " size " + std::to_string(alloc.out_address.target_type.GetSize());
     lines.push_back(line);
 }
 
@@ -107,7 +107,7 @@ void IR_Print_Pass::RunOn(Half_Ir_Load& load)
 {
     std::string line = std::string(indent, ' ') + load.out_register.reg.l + " = load ";
     line += load.address.real_address->base.l + " offset " + std::to_string(load.address.real_address->offset);
-    line += " size " + std::to_string(load.address.type.GetSize());
+    line += " size " + std::to_string(load.address.target_type.GetSize());
     lines.push_back(line);
 }
 
@@ -116,7 +116,7 @@ void IR_Print_Pass::RunOn(Half_Ir_Store& store)
     std::string line = std::string(indent, ' ') + "store ";
     line += store.value.GetLabel().l + " to ";
     line += store.address.real_address->base.l + " offset " + std::to_string(store.address.real_address->offset);
-    line += " size " + std::to_string(store.address.type.GetSize());
+    line += " size " + std::to_string(store.address.target_type.GetSize());
     lines.push_back(line);
 }
 
@@ -158,7 +158,7 @@ void IR_Print_Pass::RunOn(Half_Ir_FetchPtr& fetch)
 {
     std::string line = std::string(indent, ' ') + fetch.out_label.l + " = fetch ";
     line += fetch.ptr.real_address->base.l + " offset " + std::to_string(fetch.ptr.real_address->offset);
-    line += " size " + std::to_string(fetch.ptr.type.GetSize());
+    line += " size " + std::to_string(fetch.ptr.target_type.GetSize());
     lines.push_back(line);
 }
 

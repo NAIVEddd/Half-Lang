@@ -657,7 +657,8 @@ inline std::string to_string(const AS_Move_Type& mv)
             reg[0] = 'r';
         }
         reg = "(%" + reg + ")";
-        dst = std::to_string(addr.real_address->offset) + reg;
+        std::string offset = addr.real_address->offset == 0 ? "" : std::to_string(addr.real_address->offset);
+        dst = offset + reg;
         return inst + src + ", " + dst + "\n";
     }
     // 3.move Address to Register
@@ -700,6 +701,8 @@ inline std::string to_string(const AS_Move_Type& mv)
             reg[0] = 'r';
         }
         src = "(%" + reg + ")";
+        std::string offset = addr.real_address->offset == 0 ? "" : std::to_string(addr.real_address->offset);
+        src = offset + src;
         return inst + src + ", " + dst + "\n";
     }
     // 4.move Address to Address (invalid instruction)

@@ -39,7 +39,7 @@ void Table::insert(Symbol& s)
         s.addr.real_address->offset = addr.offset;
         s.addr.real_address->type = addr.type;
     }
-    s.addr.type = s.type;
+    s.addr.target_type = s.type;
     s.offset = s.addr.real_address->offset;
     values.insert({ s.name, s });
 }

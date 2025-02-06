@@ -85,23 +85,23 @@ struct RealAddress
 
 struct Address
 {   // format as offset(base)
-    Half_Type_Info type;    // TODO : is this a element type or a pointer type
+    Half_Type_Info target_type;    // TODO : is this a element type or a pointer type
     std::shared_ptr<RealAddress> real_address;
     Temp::Label reg;
 
     Address()
     {
-        type = Half_Type_Info::BasicType::BasicT::Invalid;
+        target_type = Half_Type_Info::BasicType::BasicT::Invalid;
         real_address = std::make_shared<RealAddress>();
         real_address->base = Temp::Label("bottom");
         real_address->offset = 0;
     }
     Address(Half_Type_Info t, std::shared_ptr<RealAddress> r, Temp::Label l = Temp::NewLabel())
-        : type(t), real_address(r), reg(l) {
+        : target_type(t), real_address(r), reg(l) {
     }
     Address(const Address& a)
     {
-        type = a.type;
+        target_type = a.target_type;
         real_address = a.real_address;
         reg = a.reg;
     }
@@ -134,7 +134,7 @@ struct Value
     {
         if (std::holds_alternative<Address>(value))
         {
-            return std::get<Address>(value).type;
+            return std::get<Address>(value).target_type;
         }
         else if (std::holds_alternative<Register>(value))
         {
@@ -190,7 +190,7 @@ struct Half_Ir_Load
 {
     Address address;
     Register out_register;
-    Half_Ir_Load(Address a) : address(a), out_register(Register{ a.type, Temp::NewLabel() }) {}
+    Half_Ir_Load(Address a) : address(a), out_register(Register{ a.target_type, Temp::NewLabel() }) {}
     Half_Ir_Load(Address a, Register r) : address(a), out_register(r) {}
     Value GetResult() const
     {
@@ -262,7 +262,7 @@ struct Half_Ir_GetElementPtr
     Temp::Label out_label;
     Half_Ir_GetElementPtr(Address a, Temp::Label l = Temp::NewLabel())
         : out_address(a), out_label(l)
-        , source_element_type(a.type)
+        , source_element_type(a.target_type)
     {
         result_element_type = source_element_type;
     }
@@ -291,7 +291,7 @@ struct Half_Ir_FetchPtr
     }
     Value GetResult() const
     {
-        return Value(Register{ Half_Type_Info::PointerType(ptr.type), out_label });
+        return Value(Register{ Half_Type_Info::PointerType(ptr.target_type), out_label });
     }
 };
 

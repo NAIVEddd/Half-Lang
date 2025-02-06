@@ -217,7 +217,7 @@ void MemoryUsagePass::Run(Half_Ir_Function &program)
         if(auto palloc = std::get_if<std::shared_ptr<Half_Ir_Alloca>>(&exp.exp))
         {
             auto alloc = **palloc;
-            auto sz = alloc.out_address.type.GetSize();
+            auto sz = alloc.out_address.target_type.GetSize();
             if (sz == 4 || sz == 8)
             {
                 allocs_map.insert({alloc.out_address, allocs_map.size()});
