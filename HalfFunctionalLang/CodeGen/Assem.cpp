@@ -1,17 +1,6 @@
 #include "Assem.h"
 
 
-void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Block>& blocks)
-{
-    for (size_t i = 0; i < builder.blocks.size(); i++)
-    {
-        auto& block = builder.blocks[i];
-        for (auto& exp : block.exps)
-        {
-            MunchExp_llvmlike(exp, blocks);
-        }
-    }
-}
 
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Block>& blocks)
 {
@@ -55,13 +44,24 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Block>& blocks)
         pinstrs->push_back(AS_StackAlloc(stack_size));
 
         // 1.5 store parameters from registers to stack
-        auto regs = std::vector<std::string>{ "ecx","edx", "r8d", "r9d" };
+        auto regs32 = std::vector<std::string>{ "ecx", "edx", "r8d", "r9d" };
+        auto regs64 = std::vector<std::string>{ "rcx","rdx", "r8", "r9" };
+        auto regs_float = std::vector<std::string>{ "xmm0", "xmm1", "xmm2", "xmm3" };
+
         size_t offset = 0;
-        for (size_t i = 0; i < (*pfunc)->args.size() && i < regs.size(); ++i)
+        for (size_t i = 0; i < (*pfunc)->args.size() && i < regs32.size(); ++i)
         {
-            AS_Move move(Temp::Label(std::to_string(offset) + "(%rsp)"), Temp::Label(regs[i]));
+            auto& ty = (*pfunc)->args_type[i];
+            auto& reg_name = ty.is_float()? regs_float[i] : (ty.GetSize() == 8 ? regs64[i] : regs32[i]);
+            AS_Move move(Temp::Label(std::to_string(offset) + "(%rsp)"), Temp::Label(reg_name));
             move.sz = (*pfunc)->args_size[i];
-            pinstrs->push_back(move);
+            //instrs.push_back(move);
+
+            RealAddress raddr = { ty, Temp::Label("bottom"), (ptrdiff_t)offset};
+            Address addr = { ty, std::make_shared<RealAddress>(raddr), Temp::NewLabel() };
+            Register reg = Register{ ty, Temp::Label(reg_name)};
+            AS_Move_Type move2(addr, reg);
+            pinstrs->push_back(move2);
             offset += (*pfunc)->args_size[i];
         }
 
@@ -140,17 +140,22 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Block>& blocks)
 
 void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs)
 {
-    for (size_t i = 0; i < builder.blocks.size(); i++)
+    /*for (size_t i = 0; i < builder.blocks.size(); i++)
     {
         auto& block = builder.blocks[i];
         for (auto& exp : block.exps)
         {
             MunchExp_llvmlike(exp, instrs);
         }
-    }
+    }*/
     for (auto& [f, s] : builder.strings)
     {
         instrs.push_back(AS_String(f, s));
+    }
+
+    for (auto& [f, s] : builder.floats)
+    {
+        instrs.push_back(AS_Float(f, s));
     }
 }
 
@@ -271,7 +276,9 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         }
         else if (auto pfloat = std::get_if<Half_Ir_Float>(&v))
         {
-            _ASSERT(false);
+            //AS_Move_Float move((*pvalue)->out_label, pfloat->out_label);
+            AS_Move_Float move(pfloat->out_label, pfloat->out_label);
+            instrs.push_back(move);
         }
         else
         {
@@ -293,13 +300,24 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         instrs.push_back(AS_StackAlloc(stack_size));
 
         // 1.5 store parameters from registers to stack
-        auto regs = std::vector<std::string>{  "ecx","edx", "r8d", "r9d" };
+        auto regs32 = std::vector<std::string>{ "ecx", "edx", "r8d", "r9d" };
+        auto regs64 = std::vector<std::string>{ "rcx","rdx", "r8", "r9" };
+        auto regs_float = std::vector<std::string>{ "xmm0", "xmm1", "xmm2", "xmm3" };
+
         size_t offset = 0;
-        for (size_t i = 0; i < (*pfunc)->args.size() && i < regs.size(); ++i)
+        for (size_t i = 0; i < (*pfunc)->args.size() && i < regs32.size(); ++i)
         {
-            AS_Move move(Temp::Label(std::to_string(offset) + "(%rsp)"), Temp::Label(regs[i]));
+            auto& ty = (*pfunc)->args_type[i];
+            auto& reg_name = ty.is_float()? regs_float[i] : (ty.GetSize() == 8 ? regs64[i] : regs32[i]);
+            AS_Move move(Temp::Label(std::to_string(offset) + "(%rsp)"), Temp::Label(reg_name));
             move.sz = (*pfunc)->args_size[i];
-            instrs.push_back(move);
+            //instrs.push_back(move);
+
+            RealAddress raddr = { ty, Temp::Label("bottom"), (ptrdiff_t)offset};
+            Address addr = { ty, std::make_shared<RealAddress>(raddr), Temp::NewLabel() };
+            Register reg = Register{ ty, Temp::Label(reg_name)};
+            AS_Move_Type move2(addr, reg);
+            instrs.push_back(move2);
             offset += (*pfunc)->args_size[i];
         }
 
@@ -418,9 +436,35 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
                 }
                 return std::string();
             };
-        AS_Oper oper(tostring((*pop)->op), movl, movr);
+        auto floattostring = [](Half_Ir_BinOp::Oper op)
+            {
+                switch (op)
+                {
+                case Half_Ir_BinOp::Oper::Unknow:
+                    break;
+                case Half_Ir_BinOp::Oper::Plus:
+                    return std::string("addss");
+                    break;
+                case Half_Ir_BinOp::Oper::Minus:
+                    return std::string("subss");
+                    break;
+                case Half_Ir_BinOp::Oper::Multy:
+                    return std::string("mulss");
+                    break;
+                case Half_Ir_BinOp::Oper::Divide:
+                    return std::string("divss");
+                    break;
+                default:
+                    break;
+                }
+                return std::string();
+            };
+        std::string assem;
+        assem = binop.left.type.is_float() ? floattostring(binop.op) : tostring(binop.op);
+        AS_Oper oper(assem, movl, movr);
         binop.left.type.GetSize() == 8 ? oper.sz = 8 : oper.sz = 4;
         binop.right.type.GetSize() == 8 ? oper.sz = 8 : oper.sz = 4;
+        oper.is_float = binop.left.type.is_float() || binop.right.type.is_float();
         instrs.push_back(oper);
         AS_Move_Type move((*pop)->GetResult(), (*pop)->left);
         instrs.push_back(move);
@@ -434,13 +478,22 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
         {
             args[i] = call.args[i].name;
         }
-        instrs.push_back(AS_Call(call.fun_name, args, call.out_register.reg));
+        instrs.push_back(AS_Call(call.fun_name, args, call.args_new, call.out_register.reg, call.out_register));
         return;
     }
     else if (auto pret = std::get_if<std::shared_ptr<Half_Ir_Return>>(&exp.exp))
     {
         auto v = (*pret)->value;
         auto label = v.GetLabel();
+        if (v.GetType().is_float())
+        {
+            Register ret_reg;
+            ret_reg.reg = Temp::Label("xmm0");
+            ret_reg.type = v.GetType();
+            instrs.push_back(AS_Move_Type(ret_reg, v));
+            instrs.push_back(AS_Return());
+            return;
+        }
         instrs.push_back(AS_Move(Temp::Label("%eax"), label));
         instrs.push_back(AS_Return());
         return;
@@ -487,9 +540,14 @@ void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs)
     {
         auto& branch = **pbr;
 
-        instrs.push_back(AS_Oper("cmp", branch.condition.left.name, branch.condition.right.name));
-        instrs.push_back(AS_Jump(branch.condition.op, branch.true_label));
-        instrs.push_back(AS_Jump(Half_Ir_Compare::GetNot(branch.condition.op), branch.false_label));
+        size_t sz = branch.condition.type.GetSize();
+        std::string assem = branch.condition.type.is_float() ? "ucomiss" : "cmp";
+        auto oper = AS_Oper(assem, branch.condition.left.name, branch.condition.right.name);
+        oper.sz = sz;
+        oper.is_float = branch.condition.type.is_float();
+        instrs.push_back(oper);
+        instrs.push_back(AS_Jump(branch.condition.op, branch.true_label, oper.is_float));
+        instrs.push_back(AS_Jump(Half_Ir_Compare::GetNot(branch.condition.op), branch.false_label, oper.is_float));
         return;
     }
     else if (auto pjmp = std::get_if<std::shared_ptr<Half_Ir_Jump>>(&exp.exp))
@@ -509,6 +567,10 @@ inline std::string to_string(const AS_String& str)
 {
     return str.label.l + ":\n\t.asciz \"" + str.str + "\"\n";
 }
+inline std::string to_string(const AS_Float& flt)
+{
+    return flt.label.l + ":\n\t.float " + std::to_string(flt.f) + "\n";
+}
 inline std::string to_string(const AS_StackAlloc& al)
 {
     auto push = std::string("pushq %rbp\n");
@@ -520,22 +582,16 @@ inline std::string to_string(const AS_Oper& op)
     if (op.sz == 8)
     {
         inst = op.assem + "q ";
-        std::string src = op.src.l;
-        if (op.src.l.starts_with('e'))
-        {
-            src[0] = 'r';
-            src = "%" + src;
-        }
-        std::string dst = op.dst.l;
-        if (op.dst.l.starts_with('e'))
-        {
-            dst[0] = 'r';
-            dst = "%" + dst;
-        }
+        std::string src = "%" + op.src.l;
+        std::string dst = "%" + op.dst.l;
         return inst + src + ", " + dst + "\n";
     }
-    auto src = op.src.l.starts_with('e') ? "%" + op.src.l : op.src.l;
-    auto dst = op.dst.l.starts_with('e') ? "%" + op.dst.l : op.dst.l;
+    auto src = "%" + op.src.l;
+    auto dst = "%" + op.dst.l;
+    if (op.is_float)
+    {
+        return op.assem + " " + src + ", " + dst + "\n";
+    }
     return op.assem + "l " + src + ", " + dst + "\n";
 }
 inline std::string to_string(const AS_Ext& ext)
@@ -591,6 +647,14 @@ inline std::string to_string(const AS_Move_String& mv)
     }
     return std::string("leaq ") + src + ", " + dst + "\n";
 }
+inline std::string to_string(const AS_Move_Float& mv)
+{
+    auto src = mv.src.l + "(%rip)";
+    std::string dst = mv.dst.l;
+    dst = "%" + dst;
+
+    return "movss " + src + ", " + dst + "\n";
+}
 inline std::string to_string(const AS_Move_Type& mv)
 {
     std::string src, dst;
@@ -610,6 +674,13 @@ inline std::string to_string(const AS_Move_Type& mv)
                 src[0] = 'r';
                 dst[0] = 'r';
             }
+            src = "%" + src;
+            dst = "%" + dst;
+            return inst + src + ", " + dst + "\n";
+        }
+        else if (src_type.is_float() && dst_type.is_float())
+        {
+            inst = "movss ";
             src = "%" + src;
             dst = "%" + dst;
             return inst + src + ", " + dst + "\n";
@@ -639,6 +710,11 @@ inline std::string to_string(const AS_Move_Type& mv)
             {
                 val.reg.l[0] = 'r';
             }
+            src = "%" + val.reg.l;
+        }
+        else if (val_type.is_float())
+        {
+            inst = "movss ";
             src = "%" + val.reg.l;
         }
         else if (val_type.is_basic())
@@ -673,6 +749,11 @@ inline std::string to_string(const AS_Move_Type& mv)
             {
                 val.reg.l[0] = 'r';
             }
+            dst = "%" + val.reg.l;
+        }
+        else if (val.type.is_float())
+        {
+            inst = "movss ";
             dst = "%" + val.reg.l;
         }
         else if (val.type.is_basic())
@@ -788,6 +869,10 @@ std::string to_string(const AS_Instr& instr)
     {
         return to_string(*pstr);
     }
+    else if (auto pflt = std::get_if<AS_Float>(&instr))
+    {
+        return to_string(*pflt);
+    }
     else if (auto palloc = std::get_if<AS_StackAlloc>(&instr))
     {
         return to_string(*palloc);
@@ -809,6 +894,10 @@ std::string to_string(const AS_Instr& instr)
         return to_string(*pmv);
     }
     else if (auto pmv = std::get_if<AS_Move_String>(&instr))
+    {
+        return to_string(*pmv);
+    }
+    else if (auto pmv = std::get_if<AS_Move_Float>(&instr))
     {
         return to_string(*pmv);
     }
@@ -856,5 +945,6 @@ std::string to_string(const AS_Instr& instr)
     {
         return to_string(*pret);
     }
+    _ASSERT(false);
     return std::string();
 }

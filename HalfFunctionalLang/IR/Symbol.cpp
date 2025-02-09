@@ -20,6 +20,18 @@ void Table::insert(Temp::Label l, std::string str)
     }
 }
 
+void Table::insert(Temp::Label l, float f)
+{
+    if (parent)
+    {
+        parent->insert(l, f);
+    }
+    else
+    {
+        floats.insert({ l, f });
+    }
+}
+
 void Table::insert(Symbol& s)
 {
     auto sz = s.type.GetSize();

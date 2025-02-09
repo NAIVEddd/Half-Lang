@@ -1614,9 +1614,6 @@ void test_ir()
         auto e1 = pexpr(prog1);
         _ASSERT(e1);
 
-        //auto v = std::get<std::shared_ptr<Half_Value>>(e1.value().first.expr);
-        //auto ir = IR_Make_Value(v);
-        auto ir_name = Trans_Expr(e1.value().first, builder);
     }
 
     {
@@ -1624,8 +1621,6 @@ void test_ir()
         auto e1 = pexpr(prog1);
         _ASSERT(e1);
 
-        //auto op = std::get<std::shared_ptr<Half_Value>>(e1.value().first.expr);
-        auto ir = Trans_Expr(e1.value().first, builder);
     }
 
     {

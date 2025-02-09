@@ -164,5 +164,8 @@
     <ClInclude Include="cmdline.h">
       <Filter>源文件</Filter>
     </ClInclude>
+    <ClInclude Include="CodeGen\Register.h">
+      <Filter>CodeGen</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

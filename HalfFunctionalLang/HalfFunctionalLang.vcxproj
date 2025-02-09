@@ -158,6 +158,7 @@
     <ClInclude Include="CodeGen\Graph.h" />
     <ClInclude Include="CodeGen\Liveness.h" />
     <ClInclude Include="CodeGen\RegAlloc.h" />
+    <ClInclude Include="CodeGen\Register.h" />
     <ClInclude Include="IR\BasicBlock.h" />
     <ClInclude Include="IR\Builder.h" />
     <ClInclude Include="IR\IR.h" />

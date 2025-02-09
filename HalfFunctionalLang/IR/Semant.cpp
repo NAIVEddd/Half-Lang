@@ -13,6 +13,47 @@ void Init_Basic_Type(std::shared_ptr<Table>& table)
     table->insert("string", std::make_shared<Half_Type_Info>(Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::String)));
 }
 
+Half_Type_Info Get_Op_Type(std::shared_ptr<Table>& table, Half_Op& expr);
+Half_Type_Info Get_Half_OpExpr_Type(std::shared_ptr<Table>& table, Half_Op::Half_OpExpr& expr)
+{
+    if (auto pvar = std::get_if<Half_Var>(&expr))
+    {
+        auto& var = *pvar;
+        auto e = Half_Expr(var);
+        return Get_Expr_Type(table, e);
+    }
+    else if (auto pval = std::get_if<Half_Value>(&expr))
+    {
+        auto& val = *pval;
+        auto e = Half_Expr(val);
+        return Get_Expr_Type(table, e);
+    }
+    else if (auto pfuncall = std::get_if<Half_Funcall>(&expr))
+    {
+        auto& funcall = *pfuncall;
+        auto e = Half_Expr(funcall);
+        return Get_Expr_Type(table, e);
+    }
+    else if (auto pop = std::get_if<Half_Op>(&expr))
+    {
+        return Get_Op_Type(table, *pop);
+    }
+    _ASSERT(false);
+    return Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Int);
+}
+
+Half_Type_Info Get_Op_Type(std::shared_ptr<Table>& table, Half_Op& expr)
+{
+    auto l_ty = Get_Half_OpExpr_Type(table, *expr.left);
+    auto r_ty = Get_Half_OpExpr_Type(table, *expr.right);
+    if (l_ty.is_basic() && r_ty.is_basic())
+    {
+        return l_ty;
+    }
+    _ASSERT(false);
+    return Half_Type_Info::BasicType(Half_Type_Info::BasicType::BasicT::Int);
+}
+
 Half_Type_Info Get_Expr_Type(std::shared_ptr<Table>& table, Half_Expr& expr)
 {
     if (auto pval = std::get_if<std::shared_ptr<Half_Value>>(&expr.expr))
@@ -90,7 +131,19 @@ Half_Type_Info Get_Expr_Type(std::shared_ptr<Table>& table, Half_Expr& expr)
     }
     else if (auto pfuncall = std::get_if<std::shared_ptr<Half_Funcall>>(&expr.expr))
     {
-        return Half_Type_Info::BasicType::BasicT::Int;
+        auto& funcall = **pfuncall;
+        auto func = table->findFunc(funcall.name);
+        if (!func)
+        {
+            //printf("Function not found: %s\n", funcall.name.c_str());
+            //_ASSERT(false);
+            return Half_Type_Info::BasicType::BasicT::Int;
+        }
+        return *(func->type.ret);
+    }
+    else if (auto pop = std::get_if<std::shared_ptr<Half_Op>>(&expr.expr))
+    {
+        return Get_Op_Type(table, **pop);
     }
     return Half_Type_Info::BasicType::BasicT::Int;
     //_ASSERT(false);
@@ -362,16 +415,16 @@ Value Trans_Op_Builder(std::shared_ptr<Table>& table, Half_Op& op, Builder& buil
 
 
     auto res = op_ir.GetResult();
-    if (auto preg = std::get_if<Register>(&res.value))
-    {
-        preg->type = type;
-    }
-    else if (auto paddr = std::get_if<Address>(&res.value))
-    {
-        // impossible
-        _ASSERT(false);
-        paddr->target_type = type;
-    }
+    //if (auto preg = std::get_if<Register>(&res.value))
+    //{
+    //    preg->type = type;
+    //}
+    //else if (auto paddr = std::get_if<Address>(&res.value))
+    //{
+    //    // impossible
+    //    _ASSERT(false);
+    //    paddr->target_type = type;
+    //}
     return res;
 }
 
@@ -429,7 +482,8 @@ Half_Ir_Name Trans_CondOp(std::shared_ptr<Table>& table, Builder& builder, Half_
 
         if (binop.op != "&&" && binop.op != "||")
         {
-            auto cmp = Half_Ir_Compare(binop.op, l, r, Temp::NewLabel());
+            auto ty = Get_Op_Type(table, binop);
+            auto cmp = Half_Ir_Compare(binop.op, ty, l, r, Temp::NewLabel());
             auto br = Half_Ir_Branch(cmp, true_label, false_label);
             builder.AddExp(br);
             return cmp.out_label;
@@ -455,21 +509,6 @@ void Trans_If_Cond(std::shared_ptr<Table>& table, Builder& builder, Half_Expr& c
     }
     printf("only support binary op exp type in if.cond\n");
     _ASSERT(false);
-}
-
-Value Trans_Expr(Half_Expr& expr, Builder& builder)
-{
-    auto table = std::make_shared<Table>();
-    Init_Basic_Type(table);
-    auto value = Trans_Expr(table, builder, expr);
-
-    // move strings in table to builder
-    for (auto& [l,s] : table->strings)
-    {
-        builder.InsertString(l, s);
-    }
-
-    return value;
 }
 
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Let& let)
@@ -594,6 +633,11 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Value& va
     }
     else if (auto pfloat = std::get_if<float>(&value.value))
     {
+        auto f = Half_Ir_Float(*pfloat);
+        Half_Ir_Value value_ir(f);
+        builder.AddExp(value_ir);
+        table->insert(f.out_label, *pfloat);
+        return f.GetResult();
     }
 
     // TODO: support other value type
@@ -754,13 +798,19 @@ Value Trans_Funcall_Args(std::shared_ptr<Table>& table, Builder& builder, Half_E
 Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_Funcall& funcall)
 {
     std::vector<Half_Ir_Name> arg_exp(funcall.args.size());
+    std::vector<Value> arg_val(funcall.args.size());
     for (size_t i = 0; i < funcall.args.size(); i++)
     {
         auto arg = Trans_Funcall_Args(table, builder, funcall.args[i]);
         arg_exp[i] = arg.GetLabel();
+        arg_val[i] = arg;
     }
-    Register funcall_res = Register{ {}, Temp::NewLabel() };
-    Half_Ir_Call call(funcall_res, Temp::Label(funcall.name), arg_exp);
+
+    auto e = Half_Expr(funcall);
+    auto ret_ty = Get_Expr_Type(table, e);
+
+    Register funcall_res = Register{ ret_ty, Temp::NewLabel() };
+    Half_Ir_Call call(funcall_res, Temp::Label(funcall.name), arg_exp, arg_val);
     builder.AddExp(call);
     return call.out_register;
 }
@@ -790,6 +840,7 @@ Value Trans_Expr(std::shared_ptr<Table>& table, Builder& builder, Half_FuncDecl&
         smb.type = *(table->findType(funcDecl.parameters[i].type_name).value());
         funcscope->insert(smb);
         func_ir.args_size.push_back(smb.type.GetSize());
+        func_ir.args_type.push_back(smb.type);
 
         Address addr = smb.addr;
         auto alloc = Half_Ir_Alloca(addr);
@@ -1076,6 +1127,11 @@ void Trans_Outer(Half_OuterExpr& outer, Builder& builder)
     for (auto& [l, s] : table->strings)
     {
         builder.InsertString(l, s);
+    }
+    // move float in table to builder
+    for (auto& [l, f] : table->floats)
+    {
+        builder.InsertFloat(l, f);
     }
 }
 

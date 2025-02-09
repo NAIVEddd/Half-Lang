@@ -20,6 +20,7 @@ struct Builder
 {
     std::vector<Half_Ir_BasicBlock> blocks;
     std::map<Temp::Label, std::string> strings;
+    std::map<Temp::Label, float> floats;
     size_t insert_point;
     size_t block_alloc_entry;
 
@@ -49,6 +50,11 @@ struct Builder
     void InsertString(Temp::Label l, std::string str)
     {
         strings.insert({ l, str });
+    }
+
+    void InsertFloat(Temp::Label l, float f)
+    {
+        floats.insert({ l, f });
     }
 
     size_t NewBlock(std::string name = "")

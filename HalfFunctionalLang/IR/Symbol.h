@@ -103,11 +103,19 @@ struct Table
     }
 
     void insert(Temp::Label l, std::string str);
+    void insert(Temp::Label l, float f);
 
     void insert(Symbol& s);
     void insert(FunctionSymbol f)
     {
-        funcs.insert({ f.name, f });
+        if (parent)
+        {
+            parent->insert(f);
+        }
+        else
+        {
+            funcs.insert({ f.name, f });
+        }
     }
     void insert(std::string name, std::shared_ptr<Half_Type_Info> t)
     {
@@ -123,6 +131,7 @@ struct Table
     std::map<std::string, Symbol> values;
     std::map<std::string, FunctionSymbol> funcs;
     std::map<Temp::Label, std::string> strings;
+    std::map<Temp::Label, float> floats;
     //std::map<std::string, Temp::Label> labels;
     std::map<std::string, std::shared_ptr<Half_Type_Info>> types;
 };

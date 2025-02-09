@@ -13,6 +13,14 @@ struct AS_String
     AS_String(const AS_String& o) : str(o.str), label(o.label) {}
 };
 
+struct AS_Float
+{
+    Temp::Label label;
+    float f;
+    AS_Float(Temp::Label l, float x) : label(l), f(x) {}
+    AS_Float(const AS_Float& o) : f(o.f), label(o.label) {}
+};
+
 struct AS_StackAlloc
 {
     size_t bytes;
@@ -23,13 +31,14 @@ struct AS_StackAlloc
 struct AS_Oper
 {
     size_t sz;
+    bool is_float;
     std::string assem;
     Temp::Label dst;
     Temp::Label src;
     AS_Oper(std::string as, Temp::Label d, Temp::Label s)
-        : sz(0), assem(as), dst(d), src(s) {}
+        : sz(0), is_float(false), assem(as), dst(d), src(s) {}
     AS_Oper(const AS_Oper& o)
-        : sz(o.sz), assem(o.assem), dst(o.dst), src(o.src) {}
+        : sz(o.sz), is_float(o.is_float), assem(o.assem), dst(o.dst), src(o.src) {}
 };
 
 struct AS_Declear
@@ -79,6 +88,16 @@ struct AS_Move_String
     AS_Move_String(Temp::Label d, Temp::Label s)
         : dst(d), src(s) {}
     AS_Move_String(const AS_Move_String& o)
+        : dst(o.dst), src(o.src) {}
+};
+
+struct AS_Move_Float
+{
+    Temp::Label dst;
+    Temp::Label src;
+    AS_Move_Float(Temp::Label d, Temp::Label s)
+        : dst(d), src(s) {}
+    AS_Move_Float(const AS_Move_Float& o)
         : dst(o.dst), src(o.src) {}
 };
 
@@ -174,6 +193,8 @@ struct AS_Jump
     AS_Jump(std::string j, Temp::Label t) : jump(std::move(j)), target(std::move(t)) {}
     AS_Jump(Oper op, Temp::Label t)
         : jump(GetOperString(op)), target(std::move(t)) {}
+    AS_Jump(Oper op, Temp::Label t, bool is_float)
+        : jump(is_float ? GetFloatOperString(op) : GetOperString(op)), target(std::move(t)) {}
     AS_Jump(const AS_Jump& o) : jump(o.jump), target(o.target) {}
     static std::string GetOperString(Oper op)
     {
@@ -196,17 +217,41 @@ struct AS_Jump
         }
         return "unknown";
     }
+    static std::string GetFloatOperString(Oper op)
+    {
+        switch (op)
+        {
+        case Half_Ir_BinOp::Oper::Less:
+            return "jb";
+        case Half_Ir_BinOp::Oper::LessEqual:
+            return "jbe";
+        case Half_Ir_BinOp::Oper::Greater:
+            return "ja";
+        case Half_Ir_BinOp::Oper::GreaterEqual:
+            return "jae";
+        case Half_Ir_BinOp::Oper::Equal:
+            return "je";
+        case Half_Ir_BinOp::Oper::NotEqual:
+            return "jne";
+        default:
+            break;
+        }
+        return "unknown";
+    }
 };
 
 struct AS_Call
 {
     Temp::Label fun_name;
     std::vector<Temp::Label> args;
+    std::vector<Value> args_new;
     Temp::Label out_label;
-    AS_Call(Temp::Label f, std::vector<Temp::Label>& a, Temp::Label o)
-        : fun_name(f), args(a), out_label(o) {}
+    Register out_register;
+    AS_Call(Temp::Label f, std::vector<Temp::Label>& a, std::vector<Value>&a_new, Temp::Label o, Register& ret)
+        : fun_name(f), args(a), args_new(a_new), out_label(o), out_register(ret) {}
     AS_Call(const AS_Call& o)
-        : fun_name(o.fun_name), args(o.args), out_label(o.out_label) {}
+        : fun_name(o.fun_name), args(o.args)
+        , args_new(o.args_new), out_label(o.out_label), out_register(o.out_register) {}
 };
 
 struct AS_Return
@@ -217,7 +262,7 @@ struct AS_Return
     AS_Return(const AS_Return& o) : bytes(o.bytes) {}
 };
 
-using AS_Instr = std::variant<std::monostate, AS_String, AS_StackAlloc, AS_Oper, AS_Declear, AS_Ext, AS_Move, AS_Move_String, AS_Move_Type, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
+using AS_Instr = std::variant<std::monostate, AS_String, AS_Float, AS_StackAlloc, AS_Oper, AS_Declear, AS_Ext, AS_Move, AS_Move_String, AS_Move_Float, AS_Move_Type, AS_Lea, AS_ElemPtr, AS_ElemLoad, AS_ElemStore, AS_ArrayLoad, AS_ArrayStore, AS_Jump, AS_Label, AS_Call, AS_Return>;
 
 struct AS_Block
 {
@@ -238,7 +283,6 @@ struct AS_Function
     }
 };
 
-void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Block>& instrs);
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Block>& instrs);
 void MunchExps_llvmlike(const Builder& builder, std::vector<AS_Instr>& instrs);
 void MunchExp_llvmlike(const Half_Ir_Exp& exp, std::vector<AS_Instr>& instrs);

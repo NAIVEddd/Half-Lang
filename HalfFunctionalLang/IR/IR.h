@@ -167,6 +167,7 @@ struct Value
     }
 
     std::variant<Address, Register> value;
+    Value() = default;
     Value(Address a) : value(a) {}
     Value(Register r) : value(r) {}
 };
@@ -307,21 +308,28 @@ struct Half_Ir_Function
     std::string name;
     Half_TypeDecl::FuncType type;
     std::vector<Half_FuncDecl::TypeField> args;
+    std::vector<Half_Type_Info> args_type;
     std::vector<size_t> args_size;
     size_t stack_size;
 
     Half_Ir_BasicBlock alloc;
     std::vector<Half_Ir_BasicBlock> blocks;
     Half_Ir_Function() = default;
-    Half_Ir_Function(std::string n, Half_TypeDecl::FuncType t, std::vector<Half_FuncDecl::TypeField>& a, std::vector<size_t>& szs, size_t sz)
-        : name(n), type(t), args(a), args_size(szs), stack_size(sz) {}
 };
 
 struct Half_Ir_Float
 {
     float f;
-    Half_Ir_Float(float x) : f(x) {}
-    Half_Ir_Float(const Half_Ir_Float& f) : f(f.f) {}
+    Temp::Label out_label;
+    /*Temp::Label f_label;
+    Half_Ir_Float(float x, Temp::Label f_l = Temp::NewLabel(), Temp::Label l = Temp::NewLabel()) : f(x), f_label(f_l), out_label(l) {}
+    Half_Ir_Float(const Half_Ir_Float& f) : f(f.f), f_label(f.f_label), out_label(f.out_label) {}*/
+    Half_Ir_Float(float x, Temp::Label l = Temp::NewLabel()) : f(x), out_label(l) {}
+    Half_Ir_Float(const Half_Ir_Float& f) : f(f.f), out_label(f.out_label) {}
+    Value GetResult() const
+    {
+        return Value(Register{ Half_Type_Info::BasicType::BasicT::Float, out_label });
+    }
 };
 
 struct Half_Ir_String
@@ -389,7 +397,7 @@ struct Half_Ir_BinOp
         }
         else if (left.type.is_basic() && right.type.is_basic())
         {
-            return Value(Register{ Half_Type_Info::BasicType::BasicT::Int, out_label });
+            return Value(Register{ left.type, out_label });
         }
         // wrong type, error message and interrupt
         _ASSERT(false);
@@ -430,15 +438,14 @@ struct Half_Ir_Compare
 {
     using Oper = Half_Ir_BinOp::Oper;
     Oper op;
+    Half_Type_Info type;
     Half_Ir_Name left;
     Half_Ir_Name right;
     Temp::Label out_label;
-    Half_Ir_Compare(Oper o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
-        : op(o), left(l), right(r), out_label(out) {}
-    Half_Ir_Compare(std::string o, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
-        : op(GetOper(o)), left(l), right(r), out_label(out) {}
+    Half_Ir_Compare(std::string o, Half_Type_Info& ty, Half_Ir_Name l, Half_Ir_Name r, Temp::Label out)
+        : op(GetOper(o)), type(ty), left(l), right(r), out_label(out) {}
     Half_Ir_Compare(const Half_Ir_Compare& c)
-        : op(c.op), left(c.left), right(c.right), out_label(c.out_label) {}
+        : op(c.op), type(c.type), left(c.left), right(c.right), out_label(c.out_label) {}
     static Oper GetOper(std::string s)
     {
         return Half_Ir_BinOp::GetOper(s);
@@ -471,8 +478,9 @@ struct Half_Ir_Call
     Register out_register;
     Temp::Label fun_name;
     std::vector<Half_Ir_Name> args;
-    Half_Ir_Call(Register r, Temp::Label n, std::vector<Half_Ir_Name>& a)
-        : out_register(r), fun_name(n), args(a) {}
+    std::vector<Value> args_new;
+    Half_Ir_Call(Register r, Temp::Label n, std::vector<Half_Ir_Name>& a, std::vector<Value>& a_new)
+        : out_register(r), fun_name(n), args(a), args_new(a_new) {}
 };
 
 struct Half_Ir_Label

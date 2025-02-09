@@ -1,0 +1,18 @@
+function add_float(a float, b float) : float =
+    a + b
+end
+
+function main() : int =
+    let x = 0.5
+    let res = 1.0
+    let ret = add_float(x, x)
+    let dif1 = ret - 1.0
+    let dif2 = 1.0 - ret
+
+    let delta = 0.0001
+    if dif2 < delta then
+        0
+    else
+        1
+    end
+end

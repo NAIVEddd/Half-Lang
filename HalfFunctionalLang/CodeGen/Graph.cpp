@@ -52,6 +52,10 @@ std::vector<Temp::Label> Node::Def() const
     {
         labels.push_back(pmv->dst);
     }
+    else if (auto pmv = std::get_if<AS_Move_Float>(&info))
+    {
+        labels.push_back(pmv->dst);
+    }
     else if (auto pmv = std::get_if<AS_Move_Type>(&info))
     {
         if (std::holds_alternative<Register>(pmv->dst.value))

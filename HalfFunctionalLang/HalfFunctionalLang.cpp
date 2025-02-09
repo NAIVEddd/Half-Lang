@@ -13,6 +13,9 @@
 #include <string>
 #include <unordered_map>
 
+void Print_Ir(Builder& builder, int idx, CmdLineArgs& cmdline, std::ofstream& output);
+void Print_Assem(std::vector<AS_Block>& blocks, CmdLineArgs& cmdline, std::ofstream& output, std::vector<Graph>& graphs);
+
 // 三地址代码表示
 struct ThreeAddressCode {
     std::string op;
@@ -114,24 +117,7 @@ int main(int argc, char* argv[])
 
         if (cmdline.ir_only)
         {
-            IR_Print_Pass printer;
-            std::vector<std::string> lines;
-            printer.Run(builder.blocks[0].exps[idx]);
-            printer.dump(lines);
-            if (cmdline.print_to_stdout)
-            {
-                for (size_t i = 0; i < lines.size(); i++)
-                {
-                    printf("%s", lines[i].c_str());
-                }
-            }
-            if (cmdline.output_to_file)
-            {
-                for (size_t i = 0; i < lines.size(); i++)
-                {
-                    output << lines[i];
-                }
-            }
+            Print_Ir(builder, idx, cmdline, output);
             continue;
         }
 
@@ -168,32 +154,79 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        AS_Declear decl(blocks[0].label.l);
-        if (cmdline.output_to_file)
-        {
-            output << to_string(decl);
-            for (auto& g : graphs)
-            {
-                for (size_t i = 0; i < g.Nodes.size(); i++)
-                {
-                    // output to file
-                    output << to_string(g.Nodes[i].info);
-                }
-            }
-        }
+        Print_Assem(blocks, cmdline, output, graphs);
+    }
+
+    if (!cmdline.ir_only && !cmdline.graph_only)
+    {
+        std::vector<AS_Instr> instrs;
+        MunchExps_llvmlike(builder, instrs);
         if (cmdline.print_to_stdout)
         {
-            printf("%s", to_string(decl).c_str());
-            for (auto& g : graphs)
+            for (size_t i = 0; i < instrs.size(); i++)
             {
-                for (size_t i = 0; i < g.Nodes.size(); i++)
-                {
-                    printf("%s", to_string(g.Nodes[i].info).c_str());
-                }
+                printf("%s", to_string(instrs[i]).c_str());
+            }
+        }
+        if (cmdline.output_to_file)
+        {
+            for (size_t i = 0; i < instrs.size(); i++)
+            {
+                output << to_string(instrs[i]);
             }
         }
     }
 
     output.close();
     return 0;
+}
+
+void Print_Assem(std::vector<AS_Block>& blocks, CmdLineArgs& cmdline, std::ofstream& output, std::vector<Graph>& graphs)
+{
+    AS_Declear decl(blocks[0].label.l);
+    if (cmdline.output_to_file)
+    {
+        output << to_string(decl);
+        for (auto& g : graphs)
+        {
+            for (size_t i = 0; i < g.Nodes.size(); i++)
+            {
+                // output to file
+                output << to_string(g.Nodes[i].info);
+            }
+        }
+    }
+    if (cmdline.print_to_stdout)
+    {
+        printf("%s", to_string(decl).c_str());
+        for (auto& g : graphs)
+        {
+            for (size_t i = 0; i < g.Nodes.size(); i++)
+            {
+                printf("%s", to_string(g.Nodes[i].info).c_str());
+            }
+        }
+    }
+}
+
+void Print_Ir(Builder& builder, int idx, CmdLineArgs& cmdline, std::ofstream& output)
+{
+    IR_Print_Pass printer;
+    std::vector<std::string> lines;
+    printer.Run(builder.blocks[0].exps[idx]);
+    printer.dump(lines);
+    if (cmdline.print_to_stdout)
+    {
+        for (size_t i = 0; i < lines.size(); i++)
+        {
+            printf("%s", lines[i].c_str());
+        }
+    }
+    if (cmdline.output_to_file)
+    {
+        for (size_t i = 0; i < lines.size(); i++)
+        {
+            output << lines[i];
+        }
+    }
 }

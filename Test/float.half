@@ -1,0 +1,19 @@
+function add_float(a float, b float) : float =
+    a + b
+end
+
+function abs(a float) : float =
+    if a < 0.0 then
+        a - 2.0 * a
+    else
+        a
+    end
+end
+
+function abs_int(a int) : int =
+    if a < 0 then
+        a - 2 * a
+    else
+        a
+    end
+end

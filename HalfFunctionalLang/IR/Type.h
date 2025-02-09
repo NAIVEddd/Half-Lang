@@ -85,6 +85,7 @@ struct Half_Type_Info
     Half_Type_Info(const Half_Type_Info& o) : type(o.type) {}
     bool is_pointer() const;
     bool is_basic() const;
+    bool is_float() const;
     std::string to_string() const;
 
     size_t GetSize();

@@ -68,6 +68,12 @@ bool Half_Type_Info::is_basic() const
     return std::holds_alternative<Half_Type_Info::BasicType>(type);
 }
 
+bool Half_Type_Info::is_float() const
+{
+    return std::holds_alternative<Half_Type_Info::BasicType>(type)
+        && std::get<Half_Type_Info::BasicType>(type).type == Half_Type_Info::BasicType::BasicT::Float;
+}
+
 std::string Half_Type_Info::to_string() const
 {
     if (std::holds_alternative<Half_Type_Info::BasicType>(type))
